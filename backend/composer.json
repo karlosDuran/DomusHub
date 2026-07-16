@@ -1,0 +1,12 @@
+{
+    "name": "domushub/backend",
+    "description": "DomusHub Backend API",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "DomusHub\\": "src/"
+        }
+    },
+    "require": {}
+}
