@@ -7,6 +7,7 @@ use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 use DomusHub\Middleware\JwtMiddleware;
 use DomusHub\Controllers\InventarioController;
+use DomusHub\Controllers\ComprasController;
 
 return function (App $app) {
     $app->group('/api/protected', function (RouteCollectorProxy $group) {
@@ -26,5 +27,8 @@ return function (App $app) {
         $group->post('/inventario', [InventarioController::class, 'crear']);
         $group->put('/inventario/{id}', [InventarioController::class, 'actualizar']);
         $group->delete('/inventario/{id}', [InventarioController::class, 'eliminar']);
+
+        // Compras endpoints
+        $group->post('/compras/registrar', [ComprasController::class, 'registrar']);
     })->add(new JwtMiddleware());
 };
