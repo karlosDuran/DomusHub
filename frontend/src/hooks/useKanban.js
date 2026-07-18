@@ -29,10 +29,59 @@ export function useKanban() {
     }
   }
 
+  const moverTarea = async (tareaId, nuevaColumnaId) => {
+    await api.patch(`/protected/kanban/tareas/${tareaId}/mover`, {
+      columna_id: Number(nuevaColumnaId),
+    })
+    setTareas((prev) =>
+      prev.map((t) =>
+        t.id === Number(tareaId)
+          ? { ...t, columna_id: Number(nuevaColumnaId) }
+          : t
+      )
+    )
+  }
+
+  const crearTarea = async (payload) => {
+    const { data } = await api.post('/protected/kanban/tareas', payload)
+    // El backend Slim API en crearTarea devuelve el objeto de tarea sin col/usuario nombre
+    // Hacemos refetch para que se cargue con los datos completos del JOIN
+    await fetchKanban()
+    return data
+  }
+
+  const actualizarTarea = async (id, payload) => {
+    const { data } = await api.put(`/protected/kanban/tareas/${id}`, payload)
+    // Mismo motivo, hacemos refetch para traer los campos joined actualizados
+    await fetchKanban()
+    return data
+  }
+
+  const eliminarTarea = async (id) => {
+    await api.delete(`/protected/kanban/tareas/${id}`)
+    setTareas((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const fetchHistorial = async (tareaId) => {
+    const { data } = await api.get(`/protected/kanban/tareas/${tareaId}/historial`)
+    return Array.isArray(data) ? data : []
+  }
+
   useEffect(() => {
     const load = async () => { await fetchKanban() }
     load()
   }, [])
 
-  return { columnas, tareas, loading, error, refetch: fetchKanban }
+  return {
+    columnas,
+    tareas,
+    loading,
+    error,
+    refetch: fetchKanban,
+    moverTarea,
+    crearTarea,
+    actualizarTarea,
+    eliminarTarea,
+    fetchHistorial
+  }
 }
