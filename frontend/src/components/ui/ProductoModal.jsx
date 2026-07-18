@@ -27,25 +27,28 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
 
   // Sincronizar form con producto cuando se abre/cambia producto
   useEffect(() => {
-    if (isOpen) {
-      if (producto) {
-        setForm({
-          nombre: producto.nombre ?? '',
-          cantidad_actual: producto.cantidad_actual ?? 0,
-          unidad_medida: producto.unidad_medida ?? 'unidad',
-          cantidad_minima: producto.cantidad_minima ?? 1,
-          precio_promedio: producto.precio_promedio ?? 0,
-        })
-      } else {
-        setForm({
-          nombre: '',
-          cantidad_actual: 0,
-          unidad_medida: 'unidad',
-          cantidad_minima: 1,
-          precio_promedio: 0,
-        })
+    const sync = async () => {
+      if (isOpen) {
+        if (producto) {
+          setForm({
+            nombre: producto.nombre ?? '',
+            cantidad_actual: producto.cantidad_actual ?? 0,
+            unidad_medida: producto.unidad_medida ?? 'unidad',
+            cantidad_minima: producto.cantidad_minima ?? 1,
+            precio_promedio: producto.precio_promedio ?? 0,
+          })
+        } else {
+          setForm({
+            nombre: '',
+            cantidad_actual: 0,
+            unidad_medida: 'unidad',
+            cantidad_minima: 1,
+            precio_promedio: 0,
+          })
+        }
       }
     }
+    sync()
   }, [isOpen, producto])
 
   // Abrir/cerrar dialog nativo

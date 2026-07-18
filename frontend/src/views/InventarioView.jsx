@@ -146,7 +146,7 @@ export default function InventarioView() {
       await eliminarProducto(modalEliminar.producto.id)
       toast.success('Producto eliminado correctamente')
       setModalEliminar({ open: false, producto: null })
-    } catch (err) {
+    } catch {
       toast.error('Error al intentar eliminar el producto.')
     } finally {
       setLoadingDelete(false)

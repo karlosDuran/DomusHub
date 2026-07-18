@@ -1,4 +1,4 @@
-import { ShoppingCart, CheckCircle, AlertTriangle, RefreshCw, Plus, Minus, DollarSign } from 'lucide-react'
+import { ShoppingCart, CheckCircle, AlertTriangle, RefreshCw, Plus, Minus } from 'lucide-react'
 import { useModoSuper } from '../hooks/useModoSuper'
 import { toast } from 'react-hot-toast'
 

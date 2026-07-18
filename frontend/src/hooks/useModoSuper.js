@@ -77,8 +77,6 @@ export function useModoSuper() {
       await api.post('/protected/compras/registrar', { items })
       setCarrito({}) // Limpiar carrito
       await fetchCriticos() // Recargar stock crítico
-    } catch (err) {
-      throw err
     } finally {
       setSubmitting(false)
     }
