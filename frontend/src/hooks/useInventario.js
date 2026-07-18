@@ -16,7 +16,9 @@ export function useInventario() {
       setLoading(true)
       setError(null)
       const { data } = await api.get('/protected/inventario')
-      setProductos(Array.isArray(data) ? data : [])
+      // El backend devuelve { data: [...], total: N }
+      const lista = Array.isArray(data?.data) ? data.data : []
+      setProductos(lista)
     } catch (err) {
       setError(err.response?.data?.error ?? err.message)
     } finally {
@@ -24,10 +26,35 @@ export function useInventario() {
     }
   }
 
+  const crearProducto = async (payload) => {
+    const { data } = await api.post('/protected/inventario', payload)
+    setProductos((prev) => [...prev, data])
+    return data
+  }
+
+  const actualizarProducto = async (id, payload) => {
+    const { data } = await api.put(`/protected/inventario/${id}`, payload)
+    setProductos((prev) => prev.map((p) => (p.id === id ? data : p)))
+    return data
+  }
+
+  const eliminarProducto = async (id) => {
+    await api.delete(`/protected/inventario/${id}`)
+    setProductos((prev) => prev.filter((p) => p.id !== id))
+  }
+
   useEffect(() => {
     const load = async () => { await fetchProductos() }
     load()
   }, [])
 
-  return { productos, loading, error, refetch: fetchProductos }
+  return {
+    productos,
+    loading,
+    error,
+    refetch: fetchProductos,
+    crearProducto,
+    actualizarProducto,
+    eliminarProducto
+  }
 }
