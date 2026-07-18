@@ -1,6 +1,11 @@
 import { useState } from 'react'
-import { Columns3, Plus, AlertTriangle, RefreshCw, Clock } from 'lucide-react'
+import { Columns3, Plus, AlertTriangle, RefreshCw, Clock, Pencil, Trash2 } from 'lucide-react'
 import { useKanban } from '../hooks/useKanban'
+import TareaModal from '../components/ui/TareaModal'
+import HistorialModal from '../components/ui/HistorialModal'
+import Modal from '../components/ui/Modal'
+import { toast } from 'react-hot-toast'
+import { useAuthStore } from '../stores/authStore'
 
 // ── Skeleton de columna ───────────────────────────────────────────────────────
 function SkeletonColumn() {
@@ -15,20 +20,54 @@ function SkeletonColumn() {
 }
 
 // ── Tarjeta de tarea ──────────────────────────────────────────────────────────
-function TareaCard({ tarea, columnas, onMover }) {
+function TareaCard({ tarea, columnas, onMover, onEdit, onDelete, onVerHistorial }) {
   return (
     <article className="card animate-fade-in-up" style={styles.tareaCard}>
-      <p style={styles.tareaTitle}>{tarea.titulo}</p>
+      <div style={styles.tareaHeader}>
+        <p style={styles.tareaTitle}>{tarea.titulo}</p>
+        <div style={styles.actions} className="task-actions">
+          <button
+            onClick={() => onVerHistorial(tarea)}
+            style={styles.actionBtn}
+            title="Ver historial de auditoría"
+            aria-label="Ver historial"
+          >
+            <Clock size={12} />
+          </button>
+          <button
+            onClick={() => onEdit(tarea)}
+            style={styles.actionBtn}
+            title="Editar tarea"
+            aria-label="Editar"
+          >
+            <Pencil size={12} />
+          </button>
+          <button
+            onClick={() => onDelete(tarea)}
+            style={styles.actionBtnDanger}
+            title="Eliminar tarea"
+            aria-label="Eliminar"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+
       {tarea.descripcion && (
         <p style={styles.tareaDesc}>{tarea.descripcion}</p>
       )}
+
       <div style={styles.tareaFooter}>
-        {tarea.asignado_nombre && (
-          <span style={styles.asignadoChip}>{tarea.asignado_nombre[0].toUpperCase()}</span>
+        {tarea.asignado_nombre ? (
+          <span style={styles.asignadoChip} title={`Asignado a: ${tarea.asignado_nombre}`}>
+            {tarea.asignado_nombre[0].toUpperCase()}
+          </span>
+        ) : (
+          <span style={styles.noAsignadoChip} title="Sin asignar">-</span>
         )}
         {tarea.es_recurrente == 1 && (
           <span className="badge" style={styles.recurrenteBadge}>
-            <Clock size={10} /> Recurrente
+            <RefreshCw size={10} /> Recurrente
           </span>
         )}
         {/* Selector rápido de columna */}
@@ -50,7 +89,7 @@ function TareaCard({ tarea, columnas, onMover }) {
 }
 
 // ── Columna Kanban ────────────────────────────────────────────────────────────
-function KanbanColumnComp({ columna, tareas, columnas, onMover }) {
+function KanbanColumnComp({ columna, tareas, columnas, onMover, onAgregarTarea, onEdit, onDelete, onVerHistorial }) {
   const colorBorder = [
     'var(--color-accent)',
     'var(--color-success)',
@@ -74,11 +113,23 @@ function KanbanColumnComp({ columna, tareas, columnas, onMover }) {
           <p style={styles.colEmpty}>Sin tareas</p>
         )}
         {tareas.map((t) => (
-          <TareaCard key={t.id} tarea={t} columnas={columnas} onMover={onMover} />
+          <TareaCard
+            key={t.id}
+            tarea={t}
+            columnas={columnas}
+            onMover={onMover}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onVerHistorial={onVerHistorial}
+          />
         ))}
       </div>
 
-      <button className="btn btn-ghost" style={styles.addTaskBtn} id={`kanban-add-${columna.id}`}>
+      <button
+        className="btn btn-ghost"
+        style={styles.addTaskBtn}
+        onClick={() => onAgregarTarea(columna.id)}
+      >
         <Plus size={15} /> Agregar tarea
       </button>
     </section>
@@ -87,17 +138,78 @@ function KanbanColumnComp({ columna, tareas, columnas, onMover }) {
 
 // ── Vista principal ───────────────────────────────────────────────────────────
 export default function KanbanView() {
-  const { columnas, tareas, loading, error, refetch } = useKanban()
-  const [filtroUser, setFiltroUser] = useState('todos')
+  const userId = useAuthStore((s) => s.user?.id)
 
-  // Placeholder de mover tarea — se implementará en Fase 5
-  const handleMover = (tareaId, nuevaColumnaId) => {
-    console.log('Mover tarea', tareaId, '→ columna', nuevaColumnaId)
+  const {
+    columnas,
+    tareas,
+    loading,
+    error,
+    refetch,
+    moverTarea,
+    crearTarea,
+    actualizarTarea,
+    eliminarTarea,
+    fetchHistorial
+  } = useKanban()
+
+  const [filtroUser, setFiltroUser] = useState('todos') // 'todos' | 'mis'
+
+  // Estados de Modales
+  const [modalTarea, setModalTarea] = useState({ open: false, tarea: null, columnaId: null })
+  const [modalHistorial, setModalHistorial] = useState({ open: false, tarea: null })
+  const [modalEliminar, setModalEliminar] = useState({ open: false, tarea: null })
+  const [loadingDelete, setLoadingDelete] = useState(false)
+
+  // Mover tarea llamando al API
+  const handleMover = async (tareaId, nuevaColumnaId) => {
+    const tarea = tareas.find(t => t.id === tareaId)
+    if (!tarea || String(tarea.columna_id) === String(nuevaColumnaId)) return
+
+    try {
+      await moverTarea(tareaId, nuevaColumnaId)
+      toast.success('Tarea movida')
+    } catch (err) {
+      toast.error('Error al mover la tarea')
+    }
+  }
+
+  // Guardar tarea (crear o editar)
+  const handleSaveTarea = async (formData) => {
+    // Si la app maneja la creación/edición, le inyectamos el asignado si corresponde
+    // En este MVP es monousuario por defecto
+    const payload = {
+      ...formData,
+      asignado_a_user_id: formData.asignado_a_user_id ?? userId
+    }
+
+    if (modalTarea.tarea) {
+      await actualizarTarea(modalTarea.tarea.id, payload)
+      toast.success('Tarea actualizada')
+    } else {
+      await crearTarea(payload)
+      toast.success('Tarea creada')
+    }
+  }
+
+  // Eliminar tarea definitivamente
+  const handleConfirmEliminar = async () => {
+    if (!modalEliminar.tarea) return
+    setLoadingDelete(true)
+    try {
+      await eliminarTarea(modalEliminar.tarea.id)
+      toast.success('Tarea eliminada correctamente')
+      setModalEliminar({ open: false, tarea: null })
+    } catch {
+      toast.error('Error al intentar eliminar la tarea.')
+    } finally {
+      setLoadingDelete(false)
+    }
   }
 
   const tareasFiltradas = filtroUser === 'todos'
     ? tareas
-    : tareas.filter((t) => String(t.asignado_a_user_id) === filtroUser)
+    : tareas.filter((t) => Number(t.asignado_a_user_id) === Number(userId))
 
   return (
     <div id="kanban-page" style={styles.page}>
@@ -109,7 +221,11 @@ export default function KanbanView() {
             {loading ? '…' : `${tareas.length} tarea${tareas.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <button className="btn btn-primary" id="kanban-new-tarea-btn">
+        <button
+          className="btn btn-primary"
+          id="kanban-new-tarea-btn"
+          onClick={() => setModalTarea({ open: true, tarea: null, columnaId: columnas[0]?.id ?? null })}
+        >
           <Plus size={18} /> Nueva tarea
         </button>
       </header>
@@ -173,10 +289,44 @@ export default function KanbanView() {
               columnas={columnas}
               tareas={tareasFiltradas.filter((t) => t.columna_id === col.id)}
               onMover={handleMover}
+              onAgregarTarea={(colId) => setModalTarea({ open: true, tarea: null, columnaId: colId })}
+              onEdit={(t) => setModalTarea({ open: true, tarea: t, columnaId: t.columna_id })}
+              onDelete={(t) => setModalEliminar({ open: true, tarea: t })}
+              onVerHistorial={(t) => setModalHistorial({ open: true, tarea: t })}
             />
           ))}
         </div>
       )}
+
+      {/* Modal para Crear/Editar Tarea */}
+      <TareaModal
+        isOpen={modalTarea.open}
+        onClose={() => setModalTarea({ open: false, tarea: null, columnaId: null })}
+        onSave={handleSaveTarea}
+        tarea={modalTarea.tarea}
+        columnas={columnas}
+        columnaInicial={modalTarea.columnaId}
+      />
+
+      {/* Modal de Historial de Auditoría */}
+      <HistorialModal
+        isOpen={modalHistorial.open}
+        onClose={() => setModalHistorial({ open: false, tarea: null })}
+        tarea={modalHistorial.tarea}
+        fetchHistorial={fetchHistorial}
+      />
+
+      {/* Modal de confirmación para eliminar */}
+      <Modal
+        isOpen={modalEliminar.open}
+        onClose={() => setModalEliminar({ open: false, tarea: null })}
+        onConfirm={handleConfirmEliminar}
+        title="Eliminar Tarea"
+        message={`¿Estás seguro de que deseas eliminar la tarea "${modalEliminar.tarea?.titulo}"? Esta acción es definitiva.`}
+        confirmText="Eliminar"
+        variant="danger"
+        loading={loadingDelete}
+      />
     </div>
   )
 }
@@ -257,12 +407,19 @@ const styles = {
     padding: '12px 14px',
     borderRadius: 'var(--radius-md)',
   },
+  tareaHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '8px',
+  },
   tareaTitle: {
     fontSize: '0.875rem',
     fontWeight: 600,
     color: 'var(--color-text)',
     marginBottom: '4px',
     lineHeight: 1.4,
+    flex: 1,
   },
   tareaDesc: {
     fontSize: '0.78rem',
@@ -275,18 +432,32 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     flexWrap: 'wrap',
+    marginTop: '4px',
   },
   asignadoChip: {
-    width: '22px',
-    height: '22px',
+    width: '20px',
+    height: '20px',
     borderRadius: '50%',
     background: 'linear-gradient(135deg, var(--color-accent), var(--color-accent-hover))',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '0.7rem',
+    fontSize: '0.68rem',
     fontWeight: 700,
     color: '#fff',
+    flexShrink: 0,
+  },
+  noAsignadoChip: {
+    width: '20px',
+    height: '20px',
+    borderRadius: '50%',
+    background: 'var(--color-surface2)',
+    border: '1px solid var(--color-border)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.68rem',
+    color: 'var(--color-muted)',
     flexShrink: 0,
   },
   recurrenteBadge: {
@@ -335,4 +506,62 @@ const styles = {
     justifyContent: 'center',
     marginBottom: '8px',
   },
+  actions: {
+    display: 'flex',
+    gap: '2px',
+    flexShrink: 0,
+  },
+  actionBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--color-muted)',
+    padding: '4px',
+    borderRadius: 'var(--radius-sm)',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'color 150ms ease, background 150ms ease',
+  },
+  actionBtnDanger: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--color-muted)',
+    padding: '4px',
+    borderRadius: 'var(--radius-sm)',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'color 150ms ease, background 150ms ease',
+  },
 }
+
+// Inyectamos CSS hover para las acciones de cada tarjeta de tarea
+const taskHoverStyleSheet = document.createElement('style')
+taskHoverStyleSheet.textContent = `
+  .tarea-card-actions-parent {
+    position: relative;
+  }
+  .card .task-actions {
+    opacity: 0.15;
+    transition: opacity 150ms ease;
+  }
+  .card:hover .task-actions {
+    opacity: 1;
+  }
+  .card .task-actions button:hover {
+    background: var(--color-surface2);
+  }
+  .card .task-actions button:nth-child(1):hover,
+  .card .task-actions button:nth-child(2):hover {
+    color: var(--color-accent);
+  }
+  .card .task-actions button:nth-child(3):hover {
+    color: var(--color-danger);
+  }
+  @media (max-width: 767px) {
+    .card .task-actions {
+      opacity: 1;
+    }
+  }
+`
+document.head.appendChild(taskHoverStyleSheet)
