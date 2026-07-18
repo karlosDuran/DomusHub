@@ -22,5 +22,6 @@ $app->addErrorMiddleware(
 // Registrar rutas
 (require __DIR__ . '/../routes/auth.php')($app);
 (require __DIR__ . '/../routes/api.php')($app);
+(require __DIR__ . '/../routes/kanban.php')($app);
 
 $app->run();
