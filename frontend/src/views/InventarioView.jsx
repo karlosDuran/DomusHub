@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { Plus, Package, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Package, AlertTriangle, RefreshCw, Pencil, Trash2 } from 'lucide-react'
 import { useInventario } from '../hooks/useInventario'
+import ProductoModal from '../components/ui/ProductoModal'
+import Modal from '../components/ui/Modal'
+import { toast } from 'react-hot-toast'
 
 // ── Componente: barra de stock coloreada ─────────────────────────────────────
 function StockBar({ porcentaje }) {
@@ -25,7 +28,7 @@ function StockBar({ porcentaje }) {
 }
 
 // ── Componente: tarjeta de producto ─────────────────────────────────────────
-function ProductoCard({ producto }) {
+function ProductoCard({ producto, onEdit, onDelete }) {
   const pct     = Number(producto.porcentaje_visual) || 0
   const critico = pct <= 25
 
@@ -41,6 +44,26 @@ function ProductoCard({ producto }) {
             {producto.cantidad_actual} {producto.unidad_medida}
           </p>
         </div>
+        {/* Acciones de Edición/Borrado */}
+        <div style={styles.actions}>
+          <button
+            onClick={() => onEdit(producto)}
+            style={styles.actionBtn}
+            title="Editar producto"
+            aria-label={`Editar ${producto.nombre}`}
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            onClick={() => onDelete(producto)}
+            style={styles.actionBtnDanger}
+            title="Eliminar producto"
+            aria-label={`Eliminar ${producto.nombre}`}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+        
         {critico && (
           <span className="badge badge-danger" style={{ gap: '4px', alignItems: 'center' }}>
             <AlertTriangle size={12} /> Crítico
@@ -54,10 +77,12 @@ function ProductoCard({ producto }) {
         )}
       </div>
       <StockBar porcentaje={pct} />
-      {producto.precio_promedio && (
+      {producto.precio_promedio ? (
         <p style={styles.cardPrice}>
           Precio ref: <strong>${Number(producto.precio_promedio).toFixed(2)}</strong>
         </p>
+      ) : (
+        <p style={styles.cardPriceMuted}>Sin precio registrado</p>
       )}
     </article>
   )
@@ -81,12 +106,52 @@ function SkeletonCard() {
 
 // ── Vista principal ───────────────────────────────────────────────────────────
 export default function InventarioView() {
-  const { productos, loading, error, refetch } = useInventario()
+  const {
+    productos,
+    loading,
+    error,
+    refetch,
+    crearProducto,
+    actualizarProducto,
+    eliminarProducto
+  } = useInventario()
+
   const [filtro, setFiltro] = useState('todo') // 'todo' | 'critico'
+
+  // Modales states
+  const [modalProducto, setModalProducto] = useState({ open: false, producto: null })
+  const [modalEliminar, setModalEliminar] = useState({ open: false, producto: null })
+  const [loadingDelete, setLoadingDelete] = useState(false)
 
   const productosFiltrados = filtro === 'critico'
     ? productos.filter((p) => Number(p.porcentaje_visual) <= 25)
     : productos
+
+  // Callback de guardado desde el ProductoModal (Crea o Edita en backend)
+  const handleSaveProducto = async (formData) => {
+    if (modalProducto.producto) {
+      // Modo edición
+      await actualizarProducto(modalProducto.producto.id, formData)
+    } else {
+      // Modo creación
+      await crearProducto(formData)
+    }
+  }
+
+  // Callback para eliminar definitivamente
+  const handleConfirmEliminar = async () => {
+    if (!modalEliminar.producto) return
+    setLoadingDelete(true)
+    try {
+      await eliminarProducto(modalEliminar.producto.id)
+      toast.success('Producto eliminado correctamente')
+      setModalEliminar({ open: false, producto: null })
+    } catch (err) {
+      toast.error('Error al intentar eliminar el producto.')
+    } finally {
+      setLoadingDelete(false)
+    }
+  }
 
   return (
     <div id="inventario-page" style={styles.page}>
@@ -98,7 +163,12 @@ export default function InventarioView() {
             {loading ? '…' : `${productos.length} producto${productos.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <button className="btn btn-primary" id="inventario-add-btn" style={{ gap: '6px' }}>
+        <button
+          className="btn btn-primary"
+          id="inventario-add-btn"
+          style={{ gap: '6px' }}
+          onClick={() => setModalProducto({ open: true, producto: null })}
+        >
           <Plus size={18} /> Agregar
         </button>
       </header>
@@ -169,10 +239,35 @@ export default function InventarioView() {
       {!loading && !error && productosFiltrados.length > 0 && (
         <div style={styles.grid}>
           {productosFiltrados.map((p) => (
-            <ProductoCard key={p.id} producto={p} />
+            <ProductoCard
+              key={p.id}
+              producto={p}
+              onEdit={(prod) => setModalProducto({ open: true, producto: prod })}
+              onDelete={(prod) => setModalEliminar({ open: true, producto: prod })}
+            />
           ))}
         </div>
       )}
+
+      {/* modal de formulario: Crear / Editar */}
+      <ProductoModal
+        isOpen={modalProducto.open}
+        onClose={() => setModalProducto({ open: false, producto: null })}
+        onSave={handleSaveProducto}
+        producto={modalProducto.producto}
+      />
+
+      {/* modal de confirmación de eliminación */}
+      <Modal
+        isOpen={modalEliminar.open}
+        onClose={() => setModalEliminar({ open: false, producto: null })}
+        onConfirm={handleConfirmEliminar}
+        title="Eliminar Producto"
+        message={`¿Estás seguro de que deseas eliminar "${modalEliminar.producto?.nombre}" del inventario? Esta acción no se puede deshacer.`}
+        confirmText="Eliminar"
+        variant="danger"
+        loading={loadingDelete}
+      />
     </div>
   )
 }
@@ -232,8 +327,8 @@ const styles = {
     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
     gap: '12px',
   },
-  card: { padding: '16px' },
-  cardHeader: { display: 'flex', alignItems: 'center', gap: '12px' },
+  card: { padding: '16px', position: 'relative' },
+  cardHeader: { display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' },
   cardIcon: {
     width: '36px',
     height: '36px',
@@ -244,9 +339,40 @@ const styles = {
     justifyContent: 'center',
     flexShrink: 0,
   },
-  cardTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text)', marginBottom: '2px' },
+  cardTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text)', marginBottom: '2px', paddingRight: '48px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   cardSub: { fontSize: '0.8rem', color: 'var(--color-muted)' },
   cardPrice: { fontSize: '0.78rem', color: 'var(--color-muted)', marginTop: '8px' },
+  cardPriceMuted: { fontSize: '0.78rem', color: 'var(--color-muted)', marginTop: '8px', fontStyle: 'italic' },
+  actions: {
+    position: 'absolute',
+    right: 0,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    display: 'flex',
+    gap: '4px',
+  },
+  actionBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--color-muted)',
+    padding: '6px',
+    borderRadius: 'var(--radius-sm)',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'color 150ms ease, background 150ms ease',
+  },
+  actionBtnDanger: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--color-muted)',
+    padding: '6px',
+    borderRadius: 'var(--radius-sm)',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'color 150ms ease, background 150ms ease',
+  },
   skeletonCard: {
     background: 'var(--color-surface)',
     border: '1px solid var(--color-border)',
@@ -281,3 +407,30 @@ const styles = {
     textAlign: 'center',
   },
 }
+
+// Inyectamos CSS hover para que los botones de acción se vean en hover en desktop, y siempre en mobile
+const hoverStyleSheet = document.createElement('style')
+hoverStyleSheet.textContent = `
+  .card .actions {
+    opacity: 0.2;
+    transition: opacity 150ms ease;
+  }
+  .card:hover .actions {
+    opacity: 1;
+  }
+  .card .actions button:hover {
+    background: var(--color-surface2);
+  }
+  .card .actions button:first-child:hover {
+    color: var(--color-accent);
+  }
+  .card .actions button:last-child:hover {
+    color: var(--color-danger);
+  }
+  @media (max-width: 767px) {
+    .card .actions {
+      opacity: 1;
+    }
+  }
+`
+document.head.appendChild(hoverStyleSheet)
