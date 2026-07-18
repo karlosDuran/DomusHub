@@ -73,6 +73,10 @@ body {
   100% { background-position: 400px 0; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .animate-fade-in-up  { animation: fadeInUp 0.3s ease forwards; }
 .animate-fade-in     { animation: fadeIn   0.25s ease forwards; }
 .animate-scale-in    { animation: scaleIn  0.2s ease forwards; }
