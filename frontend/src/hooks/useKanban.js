@@ -29,7 +29,10 @@ export function useKanban() {
     }
   }
 
-  useEffect(() => { fetchKanban() }, [])
+  useEffect(() => {
+    const load = async () => { await fetchKanban() }
+    load()
+  }, [])
 
   return { columnas, tareas, loading, error, refetch: fetchKanban }
 }

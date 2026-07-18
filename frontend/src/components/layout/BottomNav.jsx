@@ -1,9 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { Package, LayoutColumns, User } from 'lucide-react'
+import { Package, Columns3, User } from 'lucide-react'
 
 const links = [
   { to: '/inventario', label: 'Despensa', Icon: Package },
-  { to: '/kanban',     label: 'Tareas',   Icon: LayoutColumns },
+  { to: '/kanban',     label: 'Tareas',   Icon: Columns3 },
   { to: '/perfil',     label: 'Perfil',   Icon: User },
 ]
 

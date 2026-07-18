@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutColumns, Plus, AlertTriangle, RefreshCw, Clock } from 'lucide-react'
+import { Columns3, Plus, AlertTriangle, RefreshCw, Clock } from 'lucide-react'
 import { useKanban } from '../hooks/useKanban'
 
 // ── Skeleton de columna ───────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ export default function KanbanView() {
       {/* Vacío */}
       {!loading && !error && columnas.length === 0 && (
         <div style={styles.centerState} className="animate-fade-in">
-          <div style={styles.emptyIcon}><LayoutColumns size={36} color="var(--color-muted)" /></div>
+          <div style={styles.emptyIcon}><Columns3 size={36} color="var(--color-muted)" /></div>
           <p style={{ color: 'var(--color-text)', fontWeight: 600 }}>No hay columnas todavía</p>
           <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>Crea la primera columna para comenzar.</p>
         </div>

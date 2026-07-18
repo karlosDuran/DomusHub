@@ -1,11 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Package, LayoutColumns, LogOut, Home } from 'lucide-react'
+import { Package, Columns3, LogOut, Home } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuthStore } from '../../stores/authStore'
 
 const links = [
   { to: '/inventario', label: 'Despensa',  Icon: Package },
-  { to: '/kanban',     label: 'Tareas',    Icon: LayoutColumns },
+  { to: '/kanban',     label: 'Tareas',    Icon: Columns3 },
 ]
 
 /**

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Plus, Package, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useInventario } from '../hooks/useInventario'
-import Spinner from '../components/ui/Spinner'
 
 // ── Componente: barra de stock coloreada ─────────────────────────────────────
 function StockBar({ porcentaje }) {

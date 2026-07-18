@@ -24,7 +24,10 @@ export function useInventario() {
     }
   }
 
-  useEffect(() => { fetchProductos() }, [])
+  useEffect(() => {
+    const load = async () => { await fetchProductos() }
+    load()
+  }, [])
 
   return { productos, loading, error, refetch: fetchProductos }
 }
