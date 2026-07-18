@@ -17,7 +17,7 @@ return function (App $app) {
         $group->get('/kanban/tareas', [KanbanController::class, 'listarTareas']);
         $group->post('/kanban/tareas', [KanbanController::class, 'crearTarea']);
         $group->put('/kanban/tareas/{id}', [KanbanController::class, 'actualizarTarea']);
-        $group->put('/kanban/tareas/{id}/mover', [KanbanController::class, 'moverTarea']);
+        $group->map(['PUT', 'PATCH'], '/kanban/tareas/{id}/mover', [KanbanController::class, 'moverTarea']);
         $group->delete('/kanban/tareas/{id}', [KanbanController::class, 'eliminarTarea']);
         $group->get('/kanban/tareas/{id}/historial', [KanbanController::class, 'listarHistorial']);
     })->add(new JwtMiddleware());
