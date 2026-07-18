@@ -5,6 +5,7 @@ import AppShell      from './components/layout/AppShell'
 import LoginView     from './views/LoginView'
 import InventarioView from './views/InventarioView'
 import KanbanView    from './views/KanbanView'
+import ModoSuperView from './views/ModoSuperView'
 import NotFoundView  from './views/NotFoundView'
 
 /**
@@ -49,6 +50,7 @@ export default function App() {
           <Route index element={<Navigate to="/inventario" replace />} />
           <Route path="inventario" element={<InventarioView />} />
           <Route path="kanban"     element={<KanbanView />} />
+          <Route path="supermercado" element={<ModoSuperView />} />
         </Route>
 
         {/* 404 */}

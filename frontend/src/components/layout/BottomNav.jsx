@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { Package, Columns3, User } from 'lucide-react'
+import { Package, Columns3, ShoppingCart, User } from 'lucide-react'
 
 const links = [
   { to: '/inventario', label: 'Despensa', Icon: Package },
   { to: '/kanban',     label: 'Tareas',   Icon: Columns3 },
+  { to: '/supermercado', label: 'Súper',  Icon: ShoppingCart },
   { to: '/perfil',     label: 'Perfil',   Icon: User },
 ]
 
@@ -66,12 +67,12 @@ const styles = {
     transition: 'color 150ms ease',
   },
   iconWrapper: {
-    padding: '4px 14px',
+    padding: '4px 10px',
     borderRadius: '999px',
     transition: 'background 150ms ease',
   },
   iconWrapperActive: {
-    padding: '4px 14px',
+    padding: '4px 10px',
     borderRadius: '999px',
     background: 'rgba(88,166,255,.15)',
     transition: 'background 150ms ease',
