@@ -169,7 +169,7 @@ export default function KanbanView() {
     try {
       await moverTarea(tareaId, nuevaColumnaId)
       toast.success('Tarea movida')
-    } catch (err) {
+    } catch {
       toast.error('Error al mover la tarea')
     }
   }
