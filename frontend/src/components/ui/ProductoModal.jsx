@@ -171,7 +171,9 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
               >
                 <option value="unidad">Unidades</option>
                 <option value="kg">Kilogramos (kg)</option>
+                <option value="gr">Gramos (gr)</option>
                 <option value="litros">Litros (l)</option>
+                <option value="ml">Mililitros (ml)</option>
                 <option value="piezas">Piezas</option>
                 <option value="cajas">Cajas</option>
                 <option value="bolsas">Bolsas</option>

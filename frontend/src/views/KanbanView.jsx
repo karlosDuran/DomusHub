@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Columns3, Plus, AlertTriangle, RefreshCw, Clock, Pencil, Trash2 } from 'lucide-react'
 import { useKanban } from '../hooks/useKanban'
 import TareaModal from '../components/ui/TareaModal'
+import TareaDetallesModal from '../components/ui/TareaDetallesModal'
 import HistorialModal from '../components/ui/HistorialModal'
 import Modal from '../components/ui/Modal'
 import { toast } from 'react-hot-toast'
 import { useAuthStore } from '../stores/authStore'
+import api from '../api/axiosInstance'
 
 // ── Skeleton de columna ───────────────────────────────────────────────────────
 function SkeletonColumn() {
@@ -20,14 +22,28 @@ function SkeletonColumn() {
 }
 
 // ── Tarjeta de tarea ──────────────────────────────────────────────────────────
-function TareaCard({ tarea, columnas, onMover, onEdit, onDelete, onVerHistorial }) {
+function TareaCard({ tarea, columnas, onMover, onEdit, onDelete, onVerHistorial, onVerDetalles }) {
+  const formatFechaVencimiento = (str) => {
+    if (!str) return null
+    const [y, m, d] = str.split('-')
+    return `${d}/${m}`
+  }
+
+  const dVenc = formatFechaVencimiento(tarea.fecha_vencimiento)
+
   return (
-    <article className="card animate-fade-in-up" style={styles.tareaCard}>
+    <article 
+      className="card animate-fade-in-up" 
+      style={{ ...styles.tareaCard, cursor: 'grab' }}
+      onClick={() => onVerDetalles(tarea)}
+      draggable
+      onDragStart={(e) => e.dataTransfer.setData('text/plain', tarea.id)}
+    >
       <div style={styles.tareaHeader}>
         <p style={styles.tareaTitle}>{tarea.titulo}</p>
         <div style={styles.actions} className="task-actions">
           <button
-            onClick={() => onVerHistorial(tarea)}
+            onClick={(e) => { e.stopPropagation(); onVerHistorial(tarea); }}
             style={styles.actionBtn}
             title="Ver historial de auditoría"
             aria-label="Ver historial"
@@ -35,7 +51,7 @@ function TareaCard({ tarea, columnas, onMover, onEdit, onDelete, onVerHistorial 
             <Clock size={12} />
           </button>
           <button
-            onClick={() => onEdit(tarea)}
+            onClick={(e) => { e.stopPropagation(); onEdit(tarea); }}
             style={styles.actionBtn}
             title="Editar tarea"
             aria-label="Editar"
@@ -43,7 +59,7 @@ function TareaCard({ tarea, columnas, onMover, onEdit, onDelete, onVerHistorial 
             <Pencil size={12} />
           </button>
           <button
-            onClick={() => onDelete(tarea)}
+            onClick={(e) => { e.stopPropagation(); onDelete(tarea); }}
             style={styles.actionBtnDanger}
             title="Eliminar tarea"
             aria-label="Eliminar"
@@ -70,10 +86,16 @@ function TareaCard({ tarea, columnas, onMover, onEdit, onDelete, onVerHistorial 
             <RefreshCw size={10} /> Recurrente
           </span>
         )}
+        {dVenc && (
+          <span className="badge" style={styles.vencimientoBadge} title={`Vence el: ${tarea.fecha_vencimiento}`}>
+            Vence: {dVenc}
+          </span>
+        )}
         {/* Selector rápido de columna */}
         {columnas.length > 1 && (
           <select
             value={tarea.columna_id}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => onMover(tarea.id, e.target.value)}
             style={styles.colSelect}
             aria-label="Mover tarea a columna"
@@ -89,7 +111,7 @@ function TareaCard({ tarea, columnas, onMover, onEdit, onDelete, onVerHistorial 
 }
 
 // ── Columna Kanban ────────────────────────────────────────────────────────────
-function KanbanColumnComp({ columna, tareas, columnas, onMover, onAgregarTarea, onEdit, onDelete, onVerHistorial }) {
+function KanbanColumnComp({ columna, tareas, columnas, onMover, onAgregarTarea, onEdit, onDelete, onVerHistorial, onVerDetalles }) {
   const colorBorder = [
     'var(--color-accent)',
     'var(--color-success)',
@@ -97,11 +119,25 @@ function KanbanColumnComp({ columna, tareas, columnas, onMover, onAgregarTarea, 
     'var(--color-danger)',
   ][columna.posicion % 4] ?? 'var(--color-accent)'
 
+  const handleDragOver = (e) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    const tareaId = e.dataTransfer.getData('text/plain')
+    if (tareaId) {
+      onMover(Number(tareaId), columna.id)
+    }
+  }
+
   return (
     <section
       className="kanban-column card"
       style={{ ...styles.column, borderTop: `3px solid ${colorBorder}` }}
       aria-label={`Columna: ${columna.nombre}`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <div style={styles.colHeader}>
         <h2 style={styles.colTitle}>{columna.nombre}</h2>
@@ -121,6 +157,7 @@ function KanbanColumnComp({ columna, tareas, columnas, onMover, onAgregarTarea, 
             onEdit={onEdit}
             onDelete={onDelete}
             onVerHistorial={onVerHistorial}
+            onVerDetalles={onVerDetalles}
           />
         ))}
       </div>
@@ -154,12 +191,27 @@ export default function KanbanView() {
   } = useKanban()
 
   const [filtroUser, setFiltroUser] = useState('todos') // 'todos' | 'mis'
+  const [usuarios, setUsuarios] = useState([])
 
   // Estados de Modales
   const [modalTarea, setModalTarea] = useState({ open: false, tarea: null, columnaId: null })
+  const [modalDetalles, setModalDetalles] = useState({ open: false, tarea: null })
   const [modalHistorial, setModalHistorial] = useState({ open: false, tarea: null })
   const [modalEliminar, setModalEliminar] = useState({ open: false, tarea: null })
   const [loadingDelete, setLoadingDelete] = useState(false)
+
+  // Cargar lista de usuarios para asignación
+  useEffect(() => {
+    const loadUsuarios = async () => {
+      try {
+        const { data } = await api.get('/protected/usuarios')
+        setUsuarios(data)
+      } catch (err) {
+        console.error('Error al cargar usuarios:', err)
+      }
+    }
+    loadUsuarios()
+  }, [])
 
   // Mover tarea llamando al API
   const handleMover = async (tareaId, nuevaColumnaId) => {
@@ -176,19 +228,32 @@ export default function KanbanView() {
 
   // Guardar tarea (crear o editar)
   const handleSaveTarea = async (formData) => {
-    // Si la app maneja la creación/edición, le inyectamos el asignado si corresponde
-    // En este MVP es monousuario por defecto
-    const payload = {
-      ...formData,
-      asignado_a_user_id: formData.asignado_a_user_id ?? userId
-    }
-
     if (modalTarea.tarea) {
-      await actualizarTarea(modalTarea.tarea.id, payload)
+      await actualizarTarea(modalTarea.tarea.id, formData)
       toast.success('Tarea actualizada')
     } else {
-      await crearTarea(payload)
+      await crearTarea(formData)
       toast.success('Tarea creada')
+    }
+  }
+
+  // Modificar un campo específico desde la vista de detalles
+  const handleUpdateTaskField = async (taskId, updatedFields) => {
+    const currentTask = tareas.find((t) => t.id === taskId)
+    if (!currentTask) return
+    const payload = {
+      titulo: currentTask.titulo,
+      descripcion: currentTask.descripcion,
+      columna_id: currentTask.columna_id,
+      es_recurrente: currentTask.es_recurrente,
+      fecha_vencimiento: currentTask.fecha_vencimiento,
+      asignado_a_user_id: currentTask.asignado_a_user_id,
+      ...updatedFields,
+    }
+    try {
+      await actualizarTarea(taskId, payload)
+    } catch {
+      toast.error('Error al actualizar la tarea')
     }
   }
 
@@ -207,9 +272,36 @@ export default function KanbanView() {
     }
   }
 
-  const tareasFiltradas = filtroUser === 'todos'
-    ? tareas
-    : tareas.filter((t) => Number(t.asignado_a_user_id) === Number(userId))
+  const diasMapeo = {
+    'lun': 1,
+    'mar': 2,
+    'mie': 3,
+    'jue': 4,
+    'vie': 5,
+    'sab': 6,
+    'dom': 0
+  }
+
+  const getDiaSemana = (fechaStr) => {
+    if (!fechaStr) return -1
+    const [year, month, day] = fechaStr.split('-').map(Number)
+    const d = new Date(year, month - 1, day)
+    return d.getDay()
+  }
+
+  const tareasFiltradas = tareas.filter((t) => {
+    if (filtroUser === 'todos') return true
+    
+    const esMia = Number(t.asignado_a_user_id) === Number(userId)
+    if (filtroUser === 'mis') return esMia
+
+    const targetDay = diasMapeo[filtroUser]
+    if (targetDay !== undefined) {
+      return esMia && getDiaSemana(t.fecha_vencimiento) === targetDay
+    }
+    
+    return true
+  })
 
   return (
     <div id="kanban-page" style={styles.page}>
@@ -231,10 +323,17 @@ export default function KanbanView() {
       </header>
 
       {/* Filtros de usuario */}
-      <div style={styles.tabs} role="tablist">
+      <div style={{ ...styles.tabs, overflowX: 'auto', paddingBottom: '8px' }} role="tablist">
         {[
           { key: 'todos',   label: 'Ver todo' },
           { key: 'mis',     label: 'Mis tareas' },
+          { key: 'lun',     label: 'Lun' },
+          { key: 'mar',     label: 'Mar' },
+          { key: 'mie',     label: 'Mié' },
+          { key: 'jue',     label: 'Jue' },
+          { key: 'vie',     label: 'Vie' },
+          { key: 'sab',     label: 'Sáb' },
+          { key: 'dom',     label: 'Dom' },
         ].map(({ key, label }) => (
           <button
             key={key}
@@ -293,6 +392,7 @@ export default function KanbanView() {
               onEdit={(t) => setModalTarea({ open: true, tarea: t, columnaId: t.columna_id })}
               onDelete={(t) => setModalEliminar({ open: true, tarea: t })}
               onVerHistorial={(t) => setModalHistorial({ open: true, tarea: t })}
+              onVerDetalles={(t) => setModalDetalles({ open: true, tarea: t })}
             />
           ))}
         </div>
@@ -306,6 +406,8 @@ export default function KanbanView() {
         tarea={modalTarea.tarea}
         columnas={columnas}
         columnaInicial={modalTarea.columnaId}
+        usuarios={usuarios}
+        currentUserId={userId}
       />
 
       {/* Modal de Historial de Auditoría */}
@@ -326,6 +428,16 @@ export default function KanbanView() {
         confirmText="Eliminar"
         variant="danger"
         loading={loadingDelete}
+      />
+
+      {/* Modal de Detalles de Tarea */}
+      <TareaDetallesModal
+        isOpen={modalDetalles.open}
+        onClose={() => setModalDetalles({ open: false, tarea: null })}
+        tarea={tareas.find(t => t.id === modalDetalles.tarea?.id)}
+        fetchHistorial={fetchHistorial}
+        usuarios={usuarios}
+        onUpdate={handleUpdateTaskField}
       />
     </div>
   )
@@ -463,6 +575,16 @@ const styles = {
   recurrenteBadge: {
     background: 'rgba(88,166,255,.1)',
     color: 'var(--color-accent)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '3px',
+    fontSize: '0.68rem',
+    padding: '2px 7px',
+    borderRadius: '999px',
+  },
+  vencimientoBadge: {
+    background: 'rgba(255, 120, 117, 0.1)',
+    color: '#ff7875',
     display: 'inline-flex',
     alignItems: 'center',
     gap: '3px',

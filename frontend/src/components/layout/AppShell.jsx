@@ -18,9 +18,7 @@ export default function AppShell() {
   return (
     <div className="app-layout">
       {/* Desktop: sidebar fija */}
-      <div style={styles.desktopOnly}>
-        <SideNav />
-      </div>
+      <SideNav />
 
       {/* Contenido principal */}
       <main className="main-content" style={{ flex: 1 }}>
@@ -28,22 +26,9 @@ export default function AppShell() {
       </main>
 
       {/* Móvil: bottom nav fija */}
-      <div style={styles.mobileOnly}>
-        <BottomNav />
-      </div>
+      <BottomNav />
     </div>
   )
-}
-
-const styles = {
-  desktopOnly: {
-    // Visible solo en desktop (≥768px)
-    display: 'none',
-  },
-  mobileOnly: {
-    // Visible solo en móvil (<768px)
-    display: 'block',
-  },
 }
 
 // Inyectamos media queries vía un style tag para no depender de Tailwind para este toggle

@@ -14,7 +14,7 @@ import { toast } from 'react-hot-toast'
  *   columnas        {array}         — Listado de columnas del Kanban
  *   columnaInicial  {number|string} — ID de columna preseleccionada para creación
  */
-export default function TareaModal({ isOpen, onClose, onSave, tarea, columnas = [], columnaInicial }) {
+export default function TareaModal({ isOpen, onClose, onSave, tarea, columnas = [], columnaInicial, usuarios = [], currentUserId }) {
   const dialogRef = useRef(null)
   const isEdit = !!tarea
 
@@ -23,6 +23,8 @@ export default function TareaModal({ isOpen, onClose, onSave, tarea, columnas = 
     descripcion: '',
     columna_id: '',
     es_recurrente: 0,
+    fecha_vencimiento: '',
+    asignado_a_user_id: '',
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -36,6 +38,8 @@ export default function TareaModal({ isOpen, onClose, onSave, tarea, columnas = 
             descripcion: tarea.descripcion ?? '',
             columna_id: tarea.columna_id ?? '',
             es_recurrente: tarea.es_recurrente === 1 ? 1 : 0,
+            fecha_vencimiento: tarea.fecha_vencimiento ?? '',
+            asignado_a_user_id: tarea.asignado_a_user_id ?? '',
           })
         } else {
           setForm({
@@ -43,6 +47,8 @@ export default function TareaModal({ isOpen, onClose, onSave, tarea, columnas = 
             descripcion: '',
             columna_id: columnaInicial ?? (columnas[0]?.id ?? ''),
             es_recurrente: 0,
+            fecha_vencimiento: '',
+            asignado_a_user_id: currentUserId ?? '',
           })
         }
       }
@@ -86,7 +92,11 @@ export default function TareaModal({ isOpen, onClose, onSave, tarea, columnas = 
 
     setSubmitting(true)
     try {
-      await onSave(form)
+      const payload = {
+        ...form,
+        asignado_a_user_id: form.asignado_a_user_id ? Number(form.asignado_a_user_id) : null
+      }
+      await onSave(payload)
       onClose()
     } catch (err) {
       const msg = err.response?.data?.errors?.[0] ?? err.response?.data?.error ?? 'Error al guardar la tarea.'
@@ -176,6 +186,45 @@ export default function TareaModal({ isOpen, onClose, onSave, tarea, columnas = 
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Asignado a */}
+          <div style={styles.fieldGroup}>
+            <label htmlFor="task-asignado" style={styles.label}>
+              Asignado a
+            </label>
+            <select
+              id="task-asignado"
+              name="asignado_a_user_id"
+              className="input"
+              value={form.asignado_a_user_id}
+              onChange={handleChange}
+              disabled={submitting}
+              style={{ appearance: 'auto' }}
+            >
+              <option value="">Sin asignar</option>
+              {usuarios.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fecha de Vencimiento */}
+          <div style={styles.fieldGroup}>
+            <label htmlFor="task-fecha" style={styles.label}>
+              Fecha de Vencimiento
+            </label>
+            <input
+              id="task-fecha"
+              name="fecha_vencimiento"
+              type="date"
+              className="input"
+              value={form.fecha_vencimiento}
+              onChange={handleChange}
+              disabled={submitting}
+            />
           </div>
 
           {/* Recurrencia */}

@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { Package, Columns3, ShoppingCart, User } from 'lucide-react'
+import { Package, Columns3, ShoppingCart, BookOpen } from 'lucide-react'
 
 const links = [
-  { to: '/inventario', label: 'Despensa', Icon: Package },
-  { to: '/kanban',     label: 'Tareas',   Icon: Columns3 },
-  { to: '/supermercado', label: 'Súper',  Icon: ShoppingCart },
-  { to: '/perfil',     label: 'Perfil',   Icon: User },
+  { to: '/inventario',   label: 'Despensa', Icon: Package },
+  { to: '/productos',    label: 'Productos', Icon: BookOpen },
+  { to: '/kanban',       label: 'Tareas',   Icon: Columns3 },
+  { to: '/lista-compra', label: 'Compras',  Icon: ShoppingCart },
 ]
 
 /**

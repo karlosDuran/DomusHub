@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Package, AlertTriangle, RefreshCw, Pencil, Trash2 } from 'lucide-react'
-import { useInventario } from '../hooks/useInventario'
+import { useInventarioStore } from '../stores/inventarioStore'
 import ProductoModal from '../components/ui/ProductoModal'
 import Modal from '../components/ui/Modal'
 import { toast } from 'react-hot-toast'
@@ -44,7 +44,7 @@ function ProductoCard({ producto, onEdit, onDelete }) {
             {producto.cantidad_actual} {producto.unidad_medida}
           </p>
         </div>
-        {/* Acciones de Edición/Borrado */}
+        {/* Acciones de Edición/Borrado y Badges */}
         <div style={styles.actions}>
           <button
             onClick={() => onEdit(producto)}
@@ -62,19 +62,18 @@ function ProductoCard({ producto, onEdit, onDelete }) {
           >
             <Trash2 size={14} />
           </button>
+          {critico && (
+            <span className="badge badge-danger" style={{ gap: '4px', alignItems: 'center' }}>
+              <AlertTriangle size={12} /> Crítico
+            </span>
+          )}
+          {!critico && pct <= 50 && (
+            <span className="badge badge-warning">{pct}%</span>
+          )}
+          {pct > 50 && (
+            <span className="badge badge-success">{pct}%</span>
+          )}
         </div>
-        
-        {critico && (
-          <span className="badge badge-danger" style={{ gap: '4px', alignItems: 'center' }}>
-            <AlertTriangle size={12} /> Crítico
-          </span>
-        )}
-        {!critico && pct <= 50 && (
-          <span className="badge badge-warning">{pct}%</span>
-        )}
-        {pct > 50 && (
-          <span className="badge badge-success">{pct}%</span>
-        )}
       </div>
       <StockBar porcentaje={pct} />
       {producto.precio_promedio ? (
@@ -106,15 +105,18 @@ function SkeletonCard() {
 
 // ── Vista principal ───────────────────────────────────────────────────────────
 export default function InventarioView() {
-  const {
-    productos,
-    loading,
-    error,
-    refetch,
-    crearProducto,
-    actualizarProducto,
-    eliminarProducto
-  } = useInventario()
+  const productos = useInventarioStore((s) => s.productos)
+  const loading = useInventarioStore((s) => s.loading)
+  const error = useInventarioStore((s) => s.error)
+  const fetchProductos = useInventarioStore((s) => s.fetchProductos)
+  const refetch = () => fetchProductos(true)
+  const crearProducto = useInventarioStore((s) => s.crearProducto)
+  const actualizarProducto = useInventarioStore((s) => s.actualizarProducto)
+  const eliminarProducto = useInventarioStore((s) => s.eliminarProducto)
+
+  useEffect(() => {
+    fetchProductos()
+  }, [fetchProductos])
 
   const [filtro, setFiltro] = useState('todo') // 'todo' | 'critico'
 
@@ -339,17 +341,16 @@ const styles = {
     justifyContent: 'center',
     flexShrink: 0,
   },
-  cardTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text)', marginBottom: '2px', paddingRight: '48px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  cardTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--color-text)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   cardSub: { fontSize: '0.8rem', color: 'var(--color-muted)' },
   cardPrice: { fontSize: '0.78rem', color: 'var(--color-muted)', marginTop: '8px' },
   cardPriceMuted: { fontSize: '0.78rem', color: 'var(--color-muted)', marginTop: '8px', fontStyle: 'italic' },
   actions: {
-    position: 'absolute',
-    right: 0,
-    top: '50%',
-    transform: 'translateY(-50%)',
     display: 'flex',
-    gap: '4px',
+    alignItems: 'center',
+    gap: '6px',
+    flexShrink: 0,
+    marginLeft: 'auto',
   },
   actionBtn: {
     background: 'none',

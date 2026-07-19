@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS tareas (
     columna_id INTEGER NOT NULL,
     asignado_a_user_id INTEGER,
     es_recurrente INTEGER NOT NULL DEFAULT 0 CHECK(es_recurrente IN (0, 1)),
+    fecha_vencimiento DATE,
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (columna_id) REFERENCES kanban_columnas(id) ON DELETE CASCADE,
     FOREIGN KEY (asignado_a_user_id) REFERENCES usuarios(id) ON DELETE SET NULL

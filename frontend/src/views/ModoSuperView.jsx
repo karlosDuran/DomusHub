@@ -1,4 +1,5 @@
-import { ShoppingCart, CheckCircle, AlertTriangle, RefreshCw, Plus, Minus } from 'lucide-react'
+import { useState } from 'react'
+import { ShoppingCart, CheckCircle, AlertTriangle, RefreshCw, Plus, Minus, X } from 'lucide-react'
 import { useModoSuper } from '../hooks/useModoSuper'
 import { toast } from 'react-hot-toast'
 
@@ -14,6 +15,20 @@ export default function ModoSuperView() {
     finalizarCompra,
     refetch,
   } = useModoSuper()
+
+  const [itemsTemp, setItemsTemp] = useState([])
+  const [inputTemp, setInputTemp] = useState('')
+
+  const handleAddTemp = (e) => {
+    e.preventDefault()
+    if (!inputTemp.trim()) return
+    setItemsTemp((prev) => [...prev, { id: Date.now(), nombre: inputTemp.trim() }])
+    setInputTemp('')
+  }
+
+  const handleRemoveTemp = (id) => {
+    setItemsTemp((prev) => prev.filter(item => item.id !== id))
+  }
 
   // Calcular el total del carrito en tiempo real
   const total = Object.values(carrito).reduce((sum, item) => {
@@ -177,6 +192,42 @@ export default function ModoSuperView() {
           })}
         </div>
       )}
+
+      {/* Sección: Agregar manualmente */}
+      <div style={{ ...styles.list, marginTop: '24px' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-text)', marginBottom: '8px' }}>
+          📝 Agregar manualmente
+        </h2>
+        <form onSubmit={handleAddTemp} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input
+            type="text"
+            className="input"
+            placeholder="Ej. Servilletas, pan, jabón..."
+            value={inputTemp}
+            onChange={(e) => setInputTemp(e.target.value)}
+          />
+          <button type="submit" className="btn btn-ghost" style={{ padding: '0 16px' }}>
+            <Plus size={18} />
+          </button>
+        </form>
+
+        {itemsTemp.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {itemsTemp.map(item => (
+              <div key={item.id} style={styles.tempItem} className="animate-fade-in-up">
+                <span style={{ fontSize: '0.9rem', color: 'var(--color-text)' }}>{item.nombre}</span>
+                <button
+                  onClick={() => handleRemoveTemp(item.id)}
+                  style={styles.actionBtnDanger}
+                  title="Eliminar"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Barra de acción fija inferior (Total + Finalizar) */}
       {Object.keys(carrito).length > 0 && (
@@ -402,6 +453,26 @@ const styles = {
     gap: '8px',
     padding: '60px 24px',
     textAlign: 'center',
+  },
+  tempItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '10px 14px',
+    background: 'rgba(22, 27, 34, 0.5)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-sm)',
+  },
+  actionBtnDanger: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--color-muted)',
+    padding: '4px',
+    borderRadius: 'var(--radius-sm)',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'color 150ms ease, background 150ms ease',
   },
   successIcon: {
     width: '72px',

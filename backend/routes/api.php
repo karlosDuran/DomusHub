@@ -22,6 +22,16 @@ return function (App $app) {
             return $response->withHeader('Content-Type', 'application/json');
         });
 
+        // Usuarios endpoint
+        $group->get('/usuarios', function (Request $request, Response $response) {
+            require_once __DIR__ . '/../config/db.php';
+            $pdo = getDBConnection();
+            $stmt = $pdo->query('SELECT id, nombre, rol FROM usuarios ORDER BY nombre ASC');
+            $users = $stmt->fetchAll();
+            $response->getBody()->write(json_encode($users, JSON_UNESCAPED_UNICODE));
+            return $response->withHeader('Content-Type', 'application/json');
+        });
+
         // Inventario endpoints
         $group->get('/inventario/critico', [InventarioController::class, 'listarCritico']);
         $group->get('/inventario', [InventarioController::class, 'listar']);

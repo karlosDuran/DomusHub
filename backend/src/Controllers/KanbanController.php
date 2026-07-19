@@ -137,6 +137,7 @@ class KanbanController
         $columna_id = (int)$data['columna_id'];
         $asignado_a_user_id = !empty($data['asignado_a_user_id']) ? (int)$data['asignado_a_user_id'] : null;
         $es_recurrente = isset($data['es_recurrente']) ? ((int)$data['es_recurrente'] === 1 ? 1 : 0) : 0;
+        $fecha_vencimiento = !empty($data['fecha_vencimiento']) ? trim((string)$data['fecha_vencimiento']) : null;
 
         $pdo = $this->getPDO();
 
@@ -156,13 +157,14 @@ class KanbanController
             }
         }
 
-        $stmt = $pdo->prepare('INSERT INTO tareas (titulo, descripcion, columna_id, asignado_a_user_id, es_recurrente) VALUES (:titulo, :descripcion, :columna_id, :asignado_a_user_id, :es_recurrente)');
+        $stmt = $pdo->prepare('INSERT INTO tareas (titulo, descripcion, columna_id, asignado_a_user_id, es_recurrente, fecha_vencimiento) VALUES (:titulo, :descripcion, :columna_id, :asignado_a_user_id, :es_recurrente, :fecha_vencimiento)');
         $stmt->execute([
             ':titulo' => $titulo,
             ':descripcion' => $descripcion,
             ':columna_id' => $columna_id,
             ':asignado_a_user_id' => $asignado_a_user_id,
-            ':es_recurrente' => $es_recurrente
+            ':es_recurrente' => $es_recurrente,
+            ':fecha_vencimiento' => $fecha_vencimiento
         ]);
 
         $id = $pdo->lastInsertId();
@@ -210,6 +212,7 @@ class KanbanController
         $columna_id = (int)$data['columna_id'];
         $asignado_a_user_id = !empty($data['asignado_a_user_id']) ? (int)$data['asignado_a_user_id'] : null;
         $es_recurrente = isset($data['es_recurrente']) ? ((int)$data['es_recurrente'] === 1 ? 1 : 0) : 0;
+        $fecha_vencimiento = !empty($data['fecha_vencimiento']) ? trim((string)$data['fecha_vencimiento']) : null;
 
         // Verificar que exista la columna
         $stmt = $pdo->prepare('SELECT id FROM kanban_columnas WHERE id = :columna_id');
@@ -227,13 +230,14 @@ class KanbanController
             }
         }
 
-        $stmt = $pdo->prepare('UPDATE tareas SET titulo = :titulo, descripcion = :descripcion, columna_id = :columna_id, asignado_a_user_id = :asignado_a_user_id, es_recurrente = :es_recurrente WHERE id = :id');
+        $stmt = $pdo->prepare('UPDATE tareas SET titulo = :titulo, descripcion = :descripcion, columna_id = :columna_id, asignado_a_user_id = :asignado_a_user_id, es_recurrente = :es_recurrente, fecha_vencimiento = :fecha_vencimiento WHERE id = :id');
         $stmt->execute([
             ':titulo' => $titulo,
             ':descripcion' => $descripcion,
             ':columna_id' => $columna_id,
             ':asignado_a_user_id' => $asignado_a_user_id,
             ':es_recurrente' => $es_recurrente,
+            ':fecha_vencimiento' => $fecha_vencimiento,
             ':id' => $id
         ]);
 
