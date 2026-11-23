@@ -8,11 +8,7 @@ import { persist } from 'zustand/middleware'
  *
  * Estado:
  *   token  — JWT firmado por el backend (null si no autenticado)
- *   user   — { id, nombre } del usuario logueado
- *
- * Acciones:
- *   login(token, user)  — guarda token y datos del usuario
- *   logout()            — limpia el estado (el interceptor de Axios lo llama en 401)
+ *   user   — { id, nombre, rol, avatar_color } del integrante logueado
  */
 export const useAuthStore = create(
   persist(
@@ -21,6 +17,11 @@ export const useAuthStore = create(
       user: null,
 
       login: (token, user) => set({ token, user }),
+
+      updateUser: (partial) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ...partial } : state.user,
+        })),
 
       logout: () => set({ token: null, user: null }),
     }),

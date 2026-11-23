@@ -2,14 +2,14 @@ import axios from 'axios'
 import { useAuthStore } from '../stores/authStore'
 
 /**
- * Instancia Axios centralizada para DomusHub.
- * - baseURL apunta a /api (el proxy de Vite lo redirige al backend Slim en :8080)
+ * Instancia Axios centralizada para HomeOps.
+ * - baseURL apunta a VITE_API_URL (/api en CloudFront y en proxy local de Vite)
  * - Interceptor de REQUEST: inyecta automáticamente el JWT en el header Authorization
- * - Interceptor de RESPONSE: limpia la sesión si el backend devuelve 401
+ * - Interceptor de RESPONSE: limpia la sesión si el backend devuelve 401 en rutas protegidas
  */
 const api = axios.create({
-  baseURL: '/api',
-  timeout: 10000,
+  baseURL: import.meta.env.VITE_API_URL || '/api',
+  timeout: 15000,
 })
 
 // ── Interceptor de petición ────────────────────────────────────────────────
@@ -25,8 +25,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expirado o inválido → cerrar sesión automáticamente
+    const url = error.config?.url || ''
+    const isPublicAuth = url.includes('/auth/login') || url.includes('/auth/perfiles')
+    if (error.response?.status === 401 && !isPublicAuth) {
       useAuthStore.getState().logout()
     }
     return Promise.reject(error)

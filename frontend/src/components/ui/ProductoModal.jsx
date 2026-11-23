@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Package, DollarSign } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { CATEGORIAS_INVENTARIO } from '../../stores/inventarioStore'
+import Spinner from './Spinner'
+
+const UNIDADES_MEDIDA = [
+  { value: 'unidad', label: 'Unidades' },
+  { value: 'L',      label: 'Litros (L)' },
+  { value: 'litros', label: 'Litros (litros)' },
+  { value: 'ml',     label: 'Mililitros (ml)' },
+  { value: 'kg',     label: 'Kilogramos (kg)' },
+  { value: 'gr',     label: 'Gramos (gr)' },
+  { value: 'rollo',  label: 'Rollos' },
+  { value: 'piezas', label: 'Piezas' },
+  { value: 'cajas',  label: 'Cajas' },
+  { value: 'bolsas', label: 'Bolsas' },
+]
 
 /**
- * ProductoModal — Modal para Crear y Editar productos del inventario.
- * Utiliza <dialog> nativo.
- *
- * Props:
- *   isOpen    {boolean}       — Estado de apertura
- *   onClose   {function}      — Cierre del modal
- *   onSave    {function}      — Callback async que guarda el producto en la API/padre: onSave(formData)
- *   producto  {object|null}   — Producto a editar (null para modo creación)
+ * ProductoModal — Modal para Crear y Editar productos del inventario (con Categoría HomeOps).
  */
 export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
   const dialogRef = useRef(null)
@@ -18,6 +26,7 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
 
   const [form, setForm] = useState({
     nombre: '',
+    categoria: 'Despensa',
     cantidad_actual: 0,
     unidad_medida: 'unidad',
     cantidad_minima: 1,
@@ -25,13 +34,15 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
   })
   const [submitting, setSubmitting] = useState(false)
 
-  // Sincronizar form con producto cuando se abre/cambia producto
   useEffect(() => {
     const sync = async () => {
       if (isOpen) {
         if (producto) {
           setForm({
             nombre: producto.nombre ?? '',
+            categoria: CATEGORIAS_INVENTARIO.includes(producto.categoria)
+              ? producto.categoria
+              : 'Despensa',
             cantidad_actual: producto.cantidad_actual ?? 0,
             unidad_medida: producto.unidad_medida ?? 'unidad',
             cantidad_minima: producto.cantidad_minima ?? 1,
@@ -40,6 +51,7 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
         } else {
           setForm({
             nombre: '',
+            categoria: 'Despensa',
             cantidad_actual: 0,
             unidad_medida: 'unidad',
             cantidad_minima: 1,
@@ -51,7 +63,6 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
     sync()
   }, [isOpen, producto])
 
-  // Abrir/cerrar dialog nativo
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
@@ -81,13 +92,25 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
       return
     }
 
+    const payload = {
+      nombre: form.nombre.trim(),
+      categoria: form.categoria || 'Despensa',
+      unidad_medida: form.unidad_medida || 'unidad',
+      cantidad_actual: Number(form.cantidad_actual) >= 0 ? Number(form.cantidad_actual) : 0,
+      cantidad_minima: Number(form.cantidad_minima) >= 0 ? Number(form.cantidad_minima) : 0,
+      precio_promedio: Number(form.precio_promedio) >= 0 ? Number(form.precio_promedio) : 0,
+    }
+
     setSubmitting(true)
     try {
-      await onSave(form)
+      await onSave(payload)
       toast.success(isEdit ? 'Producto actualizado' : 'Producto creado')
       onClose()
     } catch (err) {
-      const msg = err.response?.data?.errors?.[0] ?? err.response?.data?.error ?? 'Error al guardar el producto.'
+      const msg =
+        err.response?.data?.errors?.[0] ??
+        err.response?.data?.error ??
+        'Error al guardar el producto.'
       toast.error(msg)
     } finally {
       setSubmitting(false)
@@ -110,7 +133,7 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
           <h2 style={styles.title}>
             {isEdit ? 'Editar Producto' : 'Nuevo Producto'}
           </h2>
-          <button onClick={onClose} style={styles.closeBtn} aria-label="Cerrar">
+          <button type="button" onClick={onClose} style={styles.closeBtn} aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
@@ -127,13 +150,35 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
               name="nombre"
               type="text"
               className="input"
-              placeholder="Ej. Leche Entera, Arroz"
+              placeholder="Ej. Leche Entera, Papel Higiénico, Arroz"
               value={form.nombre}
               onChange={handleChange}
               required
               disabled={submitting}
               autoComplete="off"
             />
+          </div>
+
+          {/* Categoría */}
+          <div style={styles.fieldGroup}>
+            <label htmlFor="prod-categoria" style={styles.label}>
+              Categoría
+            </label>
+            <select
+              id="prod-categoria"
+              name="categoria"
+              className="input"
+              value={form.categoria}
+              onChange={handleChange}
+              disabled={submitting}
+              style={{ appearance: 'auto' }}
+            >
+              {CATEGORIAS_INVENTARIO.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div style={styles.row}>
@@ -148,7 +193,7 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
                 type="number"
                 step="any"
                 min="0"
-                className="input"
+                className="input font-mono-num"
                 value={form.cantidad_actual}
                 onChange={handleChange}
                 disabled={submitting}
@@ -169,14 +214,11 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
                 disabled={submitting}
                 style={{ appearance: 'auto' }}
               >
-                <option value="unidad">Unidades</option>
-                <option value="kg">Kilogramos (kg)</option>
-                <option value="gr">Gramos (gr)</option>
-                <option value="litros">Litros (l)</option>
-                <option value="ml">Mililitros (ml)</option>
-                <option value="piezas">Piezas</option>
-                <option value="cajas">Cajas</option>
-                <option value="bolsas">Bolsas</option>
+                {UNIDADES_MEDIDA.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -185,7 +227,7 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
             {/* Cantidad Mínima */}
             <div style={{ ...styles.fieldGroup, flex: 1 }}>
               <label htmlFor="prod-cant-minima" style={styles.label}>
-                Cant. Mínima (Alerta)
+                Umbral Mínimo (Alerta SNS)
               </label>
               <input
                 id="prod-cant-minima"
@@ -193,7 +235,7 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
                 type="number"
                 step="any"
                 min="0"
-                className="input"
+                className="input font-mono-num"
                 value={form.cantidad_minima}
                 onChange={handleChange}
                 disabled={submitting}
@@ -215,7 +257,7 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
                   type="number"
                   step="0.01"
                   min="0"
-                  className="input"
+                  className="input font-mono-num"
                   value={form.precio_promedio}
                   onChange={handleChange}
                   disabled={submitting}
@@ -240,7 +282,7 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
               className="btn btn-primary"
               disabled={submitting}
             >
-              {submitting && <span style={styles.spinnerInline} aria-hidden="true" />}
+              {submitting && <Spinner size="sm" color="currentColor" />}
               {isEdit ? 'Guardar Cambios' : 'Crear Producto'}
             </button>
           </div>
@@ -254,16 +296,17 @@ const styles = {
   dialog: {
     width: '90vw',
     maxWidth: '480px',
+    margin: 'auto',
     background: 'none',
     border: 'none',
     padding: 0,
   },
   content: {
     background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
+    border: '1px solid var(--color-border-strong)',
     borderRadius: 'var(--radius-lg)',
     padding: '28px 24px',
-    boxShadow: '0 20px 60px rgba(0,0,0,.6)',
+    boxShadow: '0 20px 48px rgba(0, 0, 0, 0.55)',
   },
   header: {
     display: 'flex',
@@ -275,7 +318,7 @@ const styles = {
     width: '36px',
     height: '36px',
     borderRadius: 'var(--radius-sm)',
-    background: 'rgba(88,166,255,.12)',
+    background: 'rgba(247, 148, 29, 0.14)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -295,7 +338,6 @@ const styles = {
     padding: '4px',
     display: 'flex',
     borderRadius: 'var(--radius-sm)',
-    transition: 'color 150ms ease',
   },
   form: {
     display: 'flex',
@@ -308,7 +350,7 @@ const styles = {
     gap: '6px',
   },
   label: {
-    fontSize: '0.85rem',
+    fontSize: '0.82rem',
     fontWeight: 500,
     color: 'var(--color-muted)',
   },
@@ -330,14 +372,5 @@ const styles = {
     justifyContent: 'flex-end',
     gap: '10px',
     marginTop: '12px',
-  },
-  spinnerInline: {
-    width: '14px',
-    height: '14px',
-    border: '2px solid rgba(255,255,255,.3)',
-    borderTopColor: '#fff',
-    borderRadius: '50%',
-    animation: 'spin 0.7s linear infinite',
-    display: 'inline-block',
   },
 }

@@ -377,25 +377,34 @@ En esta fase se adapta el frontend React existente (`frontend/`) para hablar con
 
 ### Tarea 2.1: Variables de Entorno, Cliente Axios, Proxy Vite y Metadatos
 
-1. Crear `frontend/.env.development`:
+1. Actualizar `.gitignore` en la raíz para permitir versionar `.env.development` y `.env.production` (manteniendo ignorados `.env` y `*.local`):
+   ```gitignore
+   .env
+   .env.*
+   !.env.example
+   !.env.development
+   !.env.production
+   *.local
+   ```
+2. Crear `frontend/.env.development`:
    ```env
    VITE_API_URL=/api
    # Opcional para desarrollar contra tu API Gateway desplegado:
    # VITE_DEV_PROXY_TARGET=https://<api-id>.execute-api.us-east-1.amazonaws.com/prod
    ```
-2. Crear `frontend/.env.production`:
+3. Crear `frontend/.env.production`:
    ```env
    VITE_API_URL=/api
    ```
    *(En producción, CloudFront enruta `https://<id>.cloudfront.net/api/*` hacia API Gateway bajo el mismo origen).*
-3. Actualizar `frontend/src/api/axiosInstance.js`:
+4. Actualizar `frontend/src/api/axiosInstance.js` (ignorando `401` en rutas públicas `/auth/login`, `/auth/login-pin` y `/auth/perfiles` para no disparar `logout()` innecesario):
    ```javascript
    const api = axios.create({
      baseURL: import.meta.env.VITE_API_URL || '/api',
      timeout: 15000,
    })
    ```
-4. Actualizar `frontend/vite.config.js` para que el proxy local `/api` lea `VITE_DEV_PROXY_TARGET` (por defecto apunta a tu API Gateway `prod` al probar desde local):
+5. Actualizar `frontend/vite.config.js` para que el proxy local `/api` lea `VITE_DEV_PROXY_TARGET` (por defecto apunta a tu API Gateway `prod` o servidor local):
    ```javascript
    import { defineConfig, loadEnv } from 'vite'
    import react from '@vitejs/plugin-react'
@@ -416,7 +425,7 @@ En esta fase se adapta el frontend React existente (`frontend/`) para hablar con
      }
    })
    ```
-5. Actualizar `frontend/index.html`: cambiar `lang="en"` → `lang="es"` y `<title>frontend</title>` → `<title>HomeOps — Gestión Doméstica</title>`.
+6. Actualizar `frontend/index.html`: cambiar `lang="en"` → `lang="es"`, `<title>frontend</title>` → `<title>HomeOps — Gestión Doméstica</title>`, añadir atributos del sistema de diseño (`data-type="software" data-radius="soft" data-buttons="solid" data-motion`) y cargar las fuentes sorteadas (`Reddit Sans` y `JetBrains Mono`).
 
 ### Tarea 2.2: Compatibilidad de IDs String y Fechas ISO 8601 (SQLite → DynamoDB)
 
@@ -457,26 +466,38 @@ En DynamoDB los identificadores son strings (`usr_admin`, `col_1`, `prod_a1b2`, 
 ### Tarea 2.3: Implementar los Módulos Faltantes de la Propuesta Técnica HomeOps
 
 1. **Módulo de Perfiles Familiares y Acceso Rápido con PIN:**
-   - **`frontend/src/views/LoginView.jsx`:** Agregar selector de 2 pestañas:
-     - **Acceso Rápido (PIN):** carga `GET /api/auth/perfiles`, muestra avatares de los integrantes del hogar, al tocar uno solicita su PIN de 4 dígitos y autentica contra `POST /api/auth/login-pin`.
+   - **`frontend/src/views/LoginView.jsx`:** Agregar selector de 2 pestañas y redirección automática a `/inventario` si ya hay sesión activa:
+     - **Acceso Rápido (PIN):** carga `GET /api/auth/perfiles`, muestra avatares de los integrantes del hogar, al tocar uno solicita su PIN de 4 dígitos y autentica contra `POST /api/auth/login-pin` (o pre-llena su usuario en la pestaña de contraseña si aún no tiene PIN configurado).
      - **Usuario y Contraseña:** mantiene el formulario actual contra `POST /api/auth/login`.
    - **`frontend/src/views/PerfilesView.jsx` *(nuevo)* + ruta `/perfiles` en `App.jsx`, `SideNav.jsx` y `BottomNav.jsx`:**
-     - Permite al `admin` crear, editar y eliminar integrantes del hogar (`nombre`, `email` para alertas SNS, `rol`, `pin` de 4 dígitos, contraseña).
+     - Permite al `admin` crear, editar y eliminar integrantes del hogar (`nombre`, `email` para alertas SNS, `rol`, `pin` de 4 dígitos con opción de desactivarlo, contraseña y color de avatar sin tonos violeta/lavanda).
+     - Sincroniza `useAuthStore.updateUser()` cuando el administrador edita su propio perfil y añade barra superior móvil (`#mobile-topbar` en `AppShell.jsx`) para cambiar de perfil o cerrar sesión en `< 768px`.
      - Muestra aviso claro recordando confirmar el correo de suscripción en Amazon SNS para recibir alertas.
 2. **Módulo de Inventario Inteligente con Categorías y Consumo Rápido:**
-   - **`frontend/src/components/ui/ProductoModal.jsx`:** Agregar campo `<select name="categoria">` (`Despensa`, `Lácteos`, `Limpieza`, `Frutas y Verduras`, `Carnes y Fríos`, `Higiene`, `Bebidas`, `Otros`).
-   - **`frontend/src/stores/inventarioStore.js`:** Añadir acción `ajustarStock(id, delta)` que llama a `PATCH /protected/inventario/${id}/stock` y actualiza el producto en el store en tiempo real.
-   - **`frontend/src/views/InventarioView.jsx` y `ProductosView.jsx`:**
+   - **`frontend/src/components/ui/ProductoModal.jsx`:** Agregar campo `<select name="categoria">` (`Despensa`, `Lácteos`, `Limpieza`, `Frutas y Verduras`, `Carnes y Fríos`, `Higiene`, `Bebidas`, `Otros`), incluir las unidades `L` y `rollo` usadas por `seed-dynamodb.mjs`, y normalizar campos numéricos antes de guardar.
+   - **`frontend/src/stores/inventarioStore.js`:** Añadir acción `ajustarStock(id, delta)` que llama a `PATCH /protected/inventario/${id}/stock`, acción `reset()` al cerrar sesión y función unificada `esProductoCritico(p)`.
+   - **`frontend/src/views/InventarioView.jsx`, `ProductosView.jsx` y `ModoSuperView.jsx`:**
      - Mostrar badge de `categoria` en cada tarjeta y pills de filtro por categoría.
      - Agregar botones rápidos **`-1`** y **`+1`** en las tarjetas de `InventarioView.jsx` para descontar productos desde la cocina en 1 clic (detona automáticamente DynamoDB Streams → SNS al llegar al mínimo).
-3. **Tablero Kanban con Prioridad, Turnos de Basura y Avisos SNS:**
+     - Añadir eliminación con modal de confirmación en `ProductosView.jsx` y sincronización de `useInventarioStore` + persistencia en `localStorage` (`homeops-lista-manual`) en `ModoSuperView.jsx`.
+3. **Tablero Kanban con Prioridad, Turnos de Basura, Gestión de Columnas y Avisos SNS:**
    - **`frontend/src/components/ui/TareaModal.jsx` y `TareaDetallesModal.jsx`:**
      - Añadir selector de **`prioridad`** (`baja`, `media`, `alta`, `urgente`).
-     - Añadir checkbox **`Turno de recolección de basura 🗑️`** (`es_turno_basura`).
-   - **`frontend/src/views/KanbanView.jsx`:**
-     - Mostrar badge visual de `prioridad` y etiqueta `🗑️ Basura` en las tarjetas.
-     - Añadir filtros rápidos por integrante familiar (usando la lista `usuarios` que ya se carga en `KanbanView.jsx`) además de `Ver todo`, `Mis tareas` y días `Lun–Dom`.
-     - Invocar `POST /api/protected/kanban/evaluar-avisos` al entrar al tablero (una vez por sesión o mediante botón manual `"Enviar avisos del día"`) mostrando un toast si SNS notificó tareas pendientes/turnos de basura.
+     - Añadir checkbox **`Turno de recolección de basura 🗑️`** (`es_turno_basura`) y refrescar el historial tras editar campos inline en `TareaDetallesModal.jsx`.
+   - **`frontend/src/hooks/useKanban.js` y `frontend/src/views/KanbanView.jsx`:**
+     - Mostrar badge visual de `prioridad` y etiqueta `🗑️ Basura` en las tarjetas, e incluir `prioridad` y `es_turno_basura` en `handleUpdateTaskField`.
+     - Añadir `crearColumna` (`POST /api/protected/kanban/columnas`) y `eliminarColumna` (`DELETE /api/protected/kanban/columnas/{id}`) con modales en `KanbanView.jsx`.
+     - Añadir filtros rápidos por integrante familiar, filtro `🗑️ Turnos basura`, además de `Ver todo`, `Mis tareas` y días `Lun–Dom`.
+     - Invocar `POST /api/protected/kanban/evaluar-avisos` al entrar al tablero (una vez por sesión en `sessionStorage`) y mediante botón manual `"Avisos del día"` mostrando un toast si SNS notificó tareas pendientes/turnos de basura.
+
+### Tarea 2.4: Aplicar el Sistema de Diseño `design-taste-frontend` (`tasteskill 2.5.1`)
+
+1. **Paleta y Tipografía Sorteadas (`frontend/.taste-skill/history.json`):**
+   - Aplicar los tokens de `white-navy-tab` (`--p-*`, acento `#f7941d` con contraste de tinta oscura `#111417` > 8:1 en botones primarios) y las fuentes `Reddit Sans` (display/texto) + `JetBrains Mono` (`tabular-nums` en cantidades, precios, porcentajes, fechas y PIN de 4 dígitos).
+   - Cero tonos violeta o lavanda en toda la interfaz y en los selectores de avatar (`#2a9d8f`, `#e76f51`, `#f4a261`, `#457b9d`, `#6a994e`, `#e9c46a`).
+2. **Superficies, Bordes y Micro-interacciones (`system.md`, `cards.md`, `motion.md`):**
+   - Superficies sólidas de un paso (`--color-bg: #090b10`, `--color-surface: #12151e`, `--color-surface2: #181c27`) con bordes hairline `1px` (`rgba(255,255,255,0.11)`) sin glassmorphism ni sombras neón.
+   - Radio `soft` (`8px` controles/botones, `12px` tarjetas, `20px` modales), botones con altura mínima táctil de `44px`, elevación `2px` en tarjetas interactivas y micro-interacción `1px` step / `0.985` press con curva `cubic-bezier(0.2, 0.8, 0.2, 1)`.
 
 ---
 

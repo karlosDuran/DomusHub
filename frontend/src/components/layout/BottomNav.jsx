@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { Package, Columns3, ShoppingCart, BookOpen } from 'lucide-react'
+import { Package, Columns3, ShoppingCart, BookOpen, Users } from 'lucide-react'
 
 const links = [
-  { to: '/inventario',   label: 'Despensa', Icon: Package },
-  { to: '/productos',    label: 'Productos', Icon: BookOpen },
-  { to: '/kanban',       label: 'Tareas',   Icon: Columns3 },
-  { to: '/lista-compra', label: 'Compras',  Icon: ShoppingCart },
+  { to: '/inventario',   label: 'Despensa',  Icon: Package },
+  { to: '/productos',    label: 'Catálogo',  Icon: BookOpen },
+  { to: '/kanban',       label: 'Tareas',    Icon: Columns3 },
+  { to: '/lista-compra', label: 'Súper',     Icon: ShoppingCart },
+  { to: '/perfiles',     label: 'Familia',   Icon: Users },
 ]
 
 /**
@@ -28,7 +29,7 @@ export default function BottomNav() {
           {({ isActive }) => (
             <>
               <span style={isActive ? styles.iconWrapperActive : styles.iconWrapper}>
-                <Icon size={22} strokeWidth={isActive ? 2.2 : 1.8} />
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
               </span>
               <span style={styles.linkLabel}>{label}</span>
             </>
@@ -49,36 +50,34 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-around',
-    background: 'rgba(22, 27, 34, 0.92)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
+    background: 'var(--color-surface)',
     borderTop: '1px solid var(--color-border)',
     zIndex: 100,
-    // Solo visible en móvil — en desktop se oculta con CSS (md:hidden equivalente)
   },
   link: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: '3px',
     textDecoration: 'none',
     flex: 1,
-    paddingTop: '8px',
-    transition: 'color 150ms ease',
+    minHeight: '48px',
+    transition: 'color 150ms var(--ease)',
   },
   iconWrapper: {
-    padding: '4px 10px',
+    padding: '3px 10px',
     borderRadius: '999px',
-    transition: 'background 150ms ease',
+    transition: 'background 150ms var(--ease)',
   },
   iconWrapperActive: {
-    padding: '4px 10px',
+    padding: '3px 10px',
     borderRadius: '999px',
-    background: 'rgba(88,166,255,.15)',
-    transition: 'background 150ms ease',
+    background: 'rgba(247, 148, 29, 0.16)',
+    transition: 'background 150ms var(--ease)',
   },
   linkLabel: {
-    fontSize: '0.7rem',
-    fontWeight: 500,
+    fontSize: '0.72rem',
+    fontWeight: 600,
   },
 }

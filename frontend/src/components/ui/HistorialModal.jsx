@@ -1,15 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Clock, AlertTriangle } from 'lucide-react'
+import { formatFechaHistorial } from '../../utils/dateFormat'
+import Spinner from './Spinner'
 
 /**
  * HistorialModal — Modal que despliega el historial de movimientos/auditoría de una tarea.
- * Utiliza <dialog> nativo.
- *
- * Props:
- *   isOpen          {boolean}  — Estado de apertura
- *   onClose         {function} — Cierre del modal
- *   tarea           {object}   — Tarea seleccionada { id, titulo }
- *   fetchHistorial  {function} — Función asíncrona del hook useKanban para cargar el historial
  */
 export default function HistorialModal({ isOpen, onClose, tarea, fetchHistorial }) {
   const dialogRef = useRef(null)
@@ -17,7 +12,6 @@ export default function HistorialModal({ isOpen, onClose, tarea, fetchHistorial 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Cargar historial al abrirse
   useEffect(() => {
     const loadData = async () => {
       if (isOpen && tarea?.id) {
@@ -36,7 +30,6 @@ export default function HistorialModal({ isOpen, onClose, tarea, fetchHistorial 
     loadData()
   }, [isOpen, tarea, fetchHistorial])
 
-  // Abrir/cerrar dialog nativo
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
@@ -49,23 +42,6 @@ export default function HistorialModal({ isOpen, onClose, tarea, fetchHistorial 
 
   const handleBackdropClick = (e) => {
     if (e.target === dialogRef.current) onClose()
-  }
-
-  // Helper para formatear fecha de SQLite
-  const formatFecha = (str) => {
-    if (!str) return ''
-    try {
-      // Reemplaza espacio con T para compatibilidad cross-browser del Date parser
-      const parsed = new Date(str.replace(' ', 'T'))
-      return parsed.toLocaleString('es-MX', {
-        day: '2-digit',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return str
-    }
   }
 
   return (
@@ -87,7 +63,7 @@ export default function HistorialModal({ isOpen, onClose, tarea, fetchHistorial 
               {tarea?.titulo}
             </p>
           </div>
-          <button onClick={onClose} style={styles.closeBtn} aria-label="Cerrar">
+          <button type="button" onClick={onClose} style={styles.closeBtn} aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
@@ -96,8 +72,10 @@ export default function HistorialModal({ isOpen, onClose, tarea, fetchHistorial 
         <div style={styles.body}>
           {loading && (
             <div style={styles.loadingArea}>
-              <span style={styles.spinner} aria-hidden="true" />
-              <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>Cargando historial...</p>
+              <Spinner size="md" />
+              <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+                Cargando historial...
+              </p>
             </div>
           )}
 
@@ -120,17 +98,18 @@ export default function HistorialModal({ isOpen, onClose, tarea, fetchHistorial 
             <div style={styles.timeline}>
               {historial.map((item, idx) => (
                 <div key={item.id || idx} style={styles.timelineItem}>
-                  {/* Nodo visual */}
                   <div style={styles.timelineNode}>
                     <div style={styles.nodePoint} />
                     {idx < historial.length - 1 && <div style={styles.nodeLine} />}
                   </div>
 
-                  {/* Contenido del evento */}
                   <div style={styles.timelineContent}>
                     <p style={styles.actionText}>{item.accion}</p>
                     <p style={styles.metaText}>
-                      Realizado por <strong>{item.usuario_nombre ?? 'Sistema'}</strong> • {formatFecha(item.fecha_registro)}
+                      Realizado por <strong>{item.usuario_nombre ?? 'Sistema'}</strong> •{' '}
+                      <span className="font-mono-num">
+                        {formatFechaHistorial(item.fecha_registro)}
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -154,16 +133,17 @@ const styles = {
   dialog: {
     width: '90vw',
     maxWidth: '460px',
+    margin: 'auto',
     background: 'none',
     border: 'none',
     padding: 0,
   },
   content: {
     background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
+    border: '1px solid var(--color-border-strong)',
     borderRadius: 'var(--radius-lg)',
-    padding: '28px 24px 20px',
-    boxShadow: '0 20px 60px rgba(0,0,0,.6)',
+    padding: '26px 24px 20px',
+    boxShadow: '0 20px 48px rgba(0, 0, 0, 0.55)',
     display: 'flex',
     flexDirection: 'column',
     maxHeight: '85vh',
@@ -179,7 +159,7 @@ const styles = {
     width: '36px',
     height: '36px',
     borderRadius: 'var(--radius-sm)',
-    background: 'rgba(88,166,255,.12)',
+    background: 'rgba(247, 148, 29, 0.14)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -206,7 +186,6 @@ const styles = {
     padding: '4px',
     display: 'flex',
     borderRadius: 'var(--radius-sm)',
-    transition: 'color 150ms ease',
   },
   body: {
     flex: 1,
@@ -223,14 +202,6 @@ const styles = {
     justifyContent: 'center',
     gap: '12px',
     padding: '40px 0',
-  },
-  spinner: {
-    width: '24px',
-    height: '24px',
-    border: '2px solid rgba(88,166,255,.2)',
-    borderTopColor: 'var(--color-accent)',
-    borderRadius: '50%',
-    animation: 'spin 0.7s linear infinite',
   },
   errorArea: {
     display: 'flex',
@@ -268,7 +239,6 @@ const styles = {
     borderRadius: '50%',
     background: 'var(--color-accent)',
     marginTop: '6px',
-    boxShadow: '0 0 8px var(--color-accent)',
   },
   nodeLine: {
     width: '2px',

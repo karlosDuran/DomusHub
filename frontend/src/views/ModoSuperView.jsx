@@ -1,7 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ShoppingCart, CheckCircle, AlertTriangle, RefreshCw, Plus, Minus, X } from 'lucide-react'
 import { useModoSuper } from '../hooks/useModoSuper'
 import { toast } from 'react-hot-toast'
+import Spinner from '../components/ui/Spinner'
+
+const STORAGE_KEY_MANUAL = 'homeops-lista-manual'
+
+function leerListaManual() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_MANUAL)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
 
 export default function ModoSuperView() {
   const {
@@ -16,8 +29,16 @@ export default function ModoSuperView() {
     refetch,
   } = useModoSuper()
 
-  const [itemsTemp, setItemsTemp] = useState([])
+  const [itemsTemp, setItemsTemp] = useState(leerListaManual)
   const [inputTemp, setInputTemp] = useState('')
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_MANUAL, JSON.stringify(itemsTemp))
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [itemsTemp])
 
   const handleAddTemp = (e) => {
     e.preventDefault()
@@ -27,19 +48,18 @@ export default function ModoSuperView() {
   }
 
   const handleRemoveTemp = (id) => {
-    setItemsTemp((prev) => prev.filter(item => item.id !== id))
+    setItemsTemp((prev) => prev.filter((item) => item.id !== id))
   }
 
-  // Calcular el total del carrito en tiempo real
   const total = Object.values(carrito).reduce((sum, item) => {
-    return sum + (item.precio_pagado * item.cantidad_comprada)
+    return sum + Number(item.precio_pagado || 0) * Number(item.cantidad_comprada || 0)
   }, 0)
 
   const handleFinalizar = async () => {
     if (Object.keys(carrito).length === 0) return
     try {
       await finalizarCompra()
-      toast.success('¡Compra registrada y stock actualizado!')
+      toast.success('¡Compra registrada y despensa actualizada!')
     } catch (err) {
       const msg = err.response?.data?.error ?? 'Ocurrió un error al registrar la compra.'
       toast.error(msg)
@@ -53,7 +73,9 @@ export default function ModoSuperView() {
         <div>
           <h1 style={styles.pageTitle}>Modo Supermercado</h1>
           <p style={styles.pageSubtitle}>
-            {loading ? '…' : `${criticos.length} insumo${criticos.length !== 1 ? 's' : ''} crítico${criticos.length !== 1 ? 's' : ''}`}
+            {loading
+              ? '…'
+              : `${criticos.length} insumo${criticos.length !== 1 ? 's' : ''} en nivel crítico`}
           </p>
         </div>
       </header>
@@ -73,7 +95,12 @@ export default function ModoSuperView() {
           <AlertTriangle size={32} color="var(--color-danger)" />
           <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>Error al cargar críticos</p>
           <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>{error}</p>
-          <button className="btn btn-ghost" onClick={refetch} style={{ marginTop: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={refetch}
+            style={{ marginTop: '8px' }}
+          >
             <RefreshCw size={16} /> Reintentar
           </button>
         </div>
@@ -98,15 +125,18 @@ export default function ModoSuperView() {
           {criticos.map((p) => {
             const enCarrito = !!carrito[p.id]
             const item = carrito[p.id]
+            const categoria = p.categoria || 'Despensa'
 
             return (
               <div
                 key={p.id}
-                className="card animate-fade-in-up"
+                className="card m-nolift animate-fade-in-up"
                 style={{
                   ...styles.itemCard,
-                  borderColor: enCarrito ? 'rgba(88,166,255,.4)' : 'var(--color-border)',
-                  background: enCarrito ? 'rgba(88,166,255,.03)' : 'rgba(22, 27, 34, 0.8)',
+                  borderColor: enCarrito ? 'var(--color-accent)' : 'var(--color-border)',
+                  background: enCarrito
+                    ? 'rgba(247, 148, 29, 0.06)'
+                    : 'var(--color-surface)',
                 }}
               >
                 {/* Fila Principal */}
@@ -120,32 +150,43 @@ export default function ModoSuperView() {
                       style={styles.checkbox}
                     />
                     <div style={{ minWidth: 0 }}>
-                      <span style={{
-                        ...styles.itemName,
-                        textDecoration: enCarrito ? 'line-through' : 'none',
-                        color: enCarrito ? 'var(--color-muted)' : 'var(--color-text)',
-                      }}>
-                        {p.nombre}
-                      </span>
-                      <div style={styles.itemMeta}>
-                        <span style={styles.metaLabel}>Mínimo: {p.cantidad_minima} {p.unidad_medida}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            ...styles.itemName,
+                            textDecoration: enCarrito ? 'line-through' : 'none',
+                            color: enCarrito ? 'var(--color-muted)' : 'var(--color-text)',
+                          }}
+                        >
+                          {p.nombre}
+                        </span>
+                        <span className="badge badge-neutral" style={{ fontSize: '0.68rem' }}>
+                          {categoria}
+                        </span>
+                      </div>
+                      <div style={styles.itemMeta} className="font-mono-num">
+                        <span style={styles.metaLabel}>
+                          Mínimo: {p.cantidad_minima} {p.unidad_medida}
+                        </span>
                         <span style={styles.separator}>•</span>
-                        <span style={styles.metaLabelDanger}>Actual: {p.cantidad_actual} {p.unidad_medida}</span>
+                        <span style={styles.metaLabelDanger}>
+                          Actual: {p.cantidad_actual} {p.unidad_medida}
+                        </span>
                       </div>
                     </div>
                   </label>
 
-                  <span className="badge badge-danger">
+                  <span className="badge badge-danger font-mono-num">
                     {p.porcentaje_visual}%
                   </span>
                 </div>
 
-                {/* Campos del Carrito (Animados/Visibles cuando se chequea) */}
+                {/* Campos del Carrito */}
                 {enCarrito && item && (
                   <div style={styles.cartInputs} className="animate-fade-in-up">
                     {/* Input: Precio pagado */}
                     <div style={styles.inputGroup}>
-                      <span style={styles.inputLabel}>Precio unitario</span>
+                      <span style={styles.inputLabel}>Precio unitario pagado</span>
                       <div style={{ position: 'relative' }}>
                         <span style={styles.currencyIcon}>$</span>
                         <input
@@ -156,30 +197,44 @@ export default function ModoSuperView() {
                           onChange={(e) => actualizarItem(p.id, 'precio_pagado', e.target.value)}
                           disabled={submitting}
                           style={styles.inlineInputPrice}
+                          className="font-mono-num"
                         />
                       </div>
                     </div>
 
                     {/* Selector de cantidad comprada */}
                     <div style={styles.inputGroup}>
-                      <span style={styles.inputLabel}>Cantidad</span>
+                      <span style={styles.inputLabel}>Cantidad comprada</span>
                       <div style={styles.quantityControls}>
                         <button
                           type="button"
-                          onClick={() => actualizarItem(p.id, 'cantidad_comprada', Math.max(1, item.cantidad_comprada - 1))}
+                          className="qtyBtn"
+                          onClick={() =>
+                            actualizarItem(
+                              p.id,
+                              'cantidad_comprada',
+                              Math.max(1, item.cantidad_comprada - 1)
+                            )
+                          }
                           disabled={submitting || item.cantidad_comprada <= 1}
                           style={styles.qtyBtn}
+                          aria-label={`Disminuir cantidad de ${p.nombre}`}
                         >
                           <Minus size={12} />
                         </button>
-                        <span style={styles.qtyText}>
-                          {item.cantidad_comprada} <small style={{ color: 'var(--color-muted)' }}>{p.unidad_medida}</small>
+                        <span style={styles.qtyText} className="font-mono-num">
+                          {item.cantidad_comprada}{' '}
+                          <small style={{ color: 'var(--color-muted)' }}>{p.unidad_medida}</small>
                         </span>
                         <button
                           type="button"
-                          onClick={() => actualizarItem(p.id, 'cantidad_comprada', item.cantidad_comprada + 1)}
+                          className="qtyBtn"
+                          onClick={() =>
+                            actualizarItem(p.id, 'cantidad_comprada', item.cantidad_comprada + 1)
+                          }
                           disabled={submitting}
                           style={styles.qtyBtn}
+                          aria-label={`Aumentar cantidad de ${p.nombre}`}
                         >
                           <Plus size={12} />
                         </button>
@@ -193,33 +248,35 @@ export default function ModoSuperView() {
         </div>
       )}
 
-      {/* Sección: Agregar manualmente */}
-      <div style={{ ...styles.list, marginTop: '24px' }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--color-text)', marginBottom: '8px' }}>
-          📝 Agregar manualmente
+      {/* Sección: Agregar manualmente (persistida en localStorage) */}
+      <div style={{ ...styles.list, marginTop: '28px' }}>
+        <h2 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>
+          Notas y artículos extra de compra
         </h2>
         <form onSubmit={handleAddTemp} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
           <input
             type="text"
             className="input"
-            placeholder="Ej. Servilletas, pan, jabón..."
+            placeholder="Ej. Servilletas, pan, bolsas de basura..."
             value={inputTemp}
             onChange={(e) => setInputTemp(e.target.value)}
           />
-          <button type="submit" className="btn btn-ghost" style={{ padding: '0 16px' }}>
+          <button type="submit" className="btn btn-ghost" style={{ padding: '0 16px' }} aria-label="Agregar nota">
             <Plus size={18} />
           </button>
         </form>
 
         {itemsTemp.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {itemsTemp.map(item => (
+            {itemsTemp.map((item) => (
               <div key={item.id} style={styles.tempItem} className="animate-fade-in-up">
                 <span style={{ fontSize: '0.9rem', color: 'var(--color-text)' }}>{item.nombre}</span>
                 <button
+                  type="button"
                   onClick={() => handleRemoveTemp(item.id)}
                   style={styles.actionBtnDanger}
-                  title="Eliminar"
+                  title="Eliminar nota"
+                  aria-label={`Eliminar ${item.nombre}`}
                 >
                   <X size={14} />
                 </button>
@@ -235,20 +292,23 @@ export default function ModoSuperView() {
           <div style={styles.bottomBarContent}>
             <div>
               <p style={styles.totalLabel}>Total Estimado</p>
-              <p style={styles.totalVal}>${total.toFixed(2)}</p>
+              <p style={styles.totalVal} className="font-mono-num">
+                ${total.toFixed(2)}
+              </p>
             </div>
             <button
+              type="button"
               onClick={handleFinalizar}
               disabled={submitting}
               className="btn btn-primary"
               style={styles.finishBtn}
             >
               {submitting ? (
-                <span style={styles.spinnerInline} aria-hidden="true" />
+                <Spinner size="sm" color="currentColor" />
               ) : (
                 <ShoppingCart size={18} />
               )}
-              {submitting ? 'Guardando…' : `Comprar (${Object.keys(carrito).length})`}
+              {submitting ? 'Guardando…' : `Registrar compra (${Object.keys(carrito).length})`}
             </button>
           </div>
         </div>
@@ -257,12 +317,11 @@ export default function ModoSuperView() {
   )
 }
 
-/* ─── Estilos ─── */
 const styles = {
   page: {
-    maxWidth: '640px',
+    maxWidth: '680px',
     margin: '0 auto',
-    paddingBottom: '100px', // espacio para la bottom bar del carrito
+    paddingBottom: '104px',
   },
   header: {
     marginBottom: '20px',
@@ -271,7 +330,6 @@ const styles = {
     fontSize: '1.6rem',
     fontWeight: 700,
     color: 'var(--color-text)',
-    letterSpacing: '-0.02em',
   },
   pageSubtitle: { color: 'var(--color-muted)', fontSize: '0.875rem', marginTop: '2px' },
   list: {
@@ -311,11 +369,11 @@ const styles = {
     background: 'var(--color-surface2)',
     cursor: 'pointer',
     accentColor: 'var(--color-accent)',
+    flexShrink: 0,
   },
   itemName: {
-    fontSize: '0.95rem',
+    fontSize: '0.96rem',
     fontWeight: 600,
-    display: 'block',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -324,19 +382,20 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    marginTop: '2px',
+    marginTop: '3px',
     flexWrap: 'wrap',
   },
   metaLabel: {
-    fontSize: '0.75rem',
+    fontSize: '0.76rem',
     color: 'var(--color-muted)',
   },
   metaLabelDanger: {
-    fontSize: '0.75rem',
-    color: 'var(--color-danger)',
+    fontSize: '0.76rem',
+    color: '#f87171',
+    fontWeight: 600,
   },
   separator: {
-    fontSize: '0.75rem',
+    fontSize: '0.76rem',
     color: 'var(--color-border)',
   },
   cartInputs: {
@@ -354,13 +413,13 @@ const styles = {
     minWidth: '140px',
   },
   inputLabel: {
-    fontSize: '0.72rem',
+    fontSize: '0.74rem',
     color: 'var(--color-muted)',
     fontWeight: 500,
   },
   currencyIcon: {
     position: 'absolute',
-    left: '8px',
+    left: '10px',
     top: '50%',
     transform: 'translateY(-50%)',
     fontSize: '0.85rem',
@@ -369,12 +428,13 @@ const styles = {
   },
   inlineInputPrice: {
     width: '100%',
-    padding: '6px 10px 6px 20px',
+    height: '36px',
+    padding: '6px 10px 6px 24px',
     background: 'var(--color-surface2)',
     border: '1px solid var(--color-border)',
     borderRadius: 'var(--radius-sm)',
     color: 'var(--color-text)',
-    fontSize: '0.85rem',
+    fontSize: '0.88rem',
     outline: 'none',
   },
   quantityControls: {
@@ -384,10 +444,10 @@ const styles = {
     borderRadius: 'var(--radius-sm)',
     background: 'var(--color-surface2)',
     overflow: 'hidden',
-    height: '32px',
+    height: '36px',
   },
   qtyBtn: {
-    width: '32px',
+    width: '36px',
     height: '100%',
     background: 'none',
     border: 'none',
@@ -396,11 +456,11 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'background 150ms ease',
+    transition: 'background 150ms var(--ease)',
   },
   qtyText: {
     padding: '0 12px',
-    fontSize: '0.85rem',
+    fontSize: '0.88rem',
     fontWeight: 600,
     display: 'inline-flex',
     alignItems: 'center',
@@ -414,15 +474,13 @@ const styles = {
     bottom: 'var(--nav-height)',
     right: 0,
     height: '76px',
-    background: 'rgba(22, 27, 34, 0.95)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    borderTop: '1px solid var(--color-border)',
+    background: 'var(--color-surface)',
+    borderTop: '1px solid var(--color-border-strong)',
     zIndex: 90,
-    boxShadow: '0 -4px 20px rgba(0,0,0,.4)',
+    boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.45)',
   },
   bottomBarContent: {
-    maxWidth: '640px',
+    maxWidth: '680px',
     margin: '0 auto',
     height: '100%',
     display: 'flex',
@@ -431,20 +489,18 @@ const styles = {
     padding: '0 20px',
   },
   totalLabel: {
-    fontSize: '0.72rem',
+    fontSize: '0.75rem',
     color: 'var(--color-muted)',
     fontWeight: 500,
-    textTransform: 'uppercase',
   },
   totalVal: {
-    fontSize: '1.4rem',
+    fontSize: '1.35rem',
     fontWeight: 700,
-    color: 'var(--color-success)',
+    color: '#4ade80',
     lineHeight: 1.1,
   },
   finishBtn: {
-    padding: '12px 24px',
-    fontSize: '0.95rem',
+    padding: '10px 22px',
   },
   centerState: {
     display: 'flex',
@@ -459,7 +515,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '10px 14px',
-    background: 'rgba(22, 27, 34, 0.5)',
+    background: 'var(--color-surface)',
     border: '1px solid var(--color-border)',
     borderRadius: 'var(--radius-sm)',
   },
@@ -472,48 +528,16 @@ const styles = {
     borderRadius: 'var(--radius-sm)',
     display: 'flex',
     alignItems: 'center',
-    transition: 'color 150ms ease, background 150ms ease',
   },
   successIcon: {
     width: '72px',
     height: '72px',
     borderRadius: 'var(--radius-lg)',
-    background: 'rgba(63,185,80,.08)',
-    border: '1px solid rgba(63,185,80,.2)',
+    background: 'rgba(46, 160, 67, 0.12)',
+    border: '1px solid rgba(46, 160, 67, 0.25)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: '8px',
   },
-  spinnerInline: {
-    width: '14px',
-    height: '14px',
-    border: '2px solid rgba(255,255,255,.3)',
-    borderTopColor: '#fff',
-    borderRadius: '50%',
-    animation: 'spin 0.7s linear infinite',
-    display: 'inline-block',
-  },
 }
-
-// Inyectamos CSS hover/focus y responsive para la bottom bar del supermercado
-const stylesSheet = document.createElement('style')
-stylesSheet.textContent = `
-  .super-bottom-bar {
-    left: 0;
-  }
-  .qtyBtn:hover:not(:disabled) {
-    background: var(--color-border);
-  }
-  .qtyBtn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-  @media (min-width: 768px) {
-    .super-bottom-bar {
-      left: var(--sidenav-width) !important;
-      bottom: 0 !important; /* En desktop no hay bottom nav */
-    }
-  }
-`
-document.head.appendChild(stylesSheet)

@@ -1,18 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { X, AlertTriangle, Info } from 'lucide-react'
+import Spinner from './Spinner'
 
 /**
- * Modal reutilizable usando <dialog> nativo.
- *
- * Props:
- *   isOpen      {boolean}   — controla si el modal está abierto
- *   onClose     {function}  — llamado al cerrar (X o backdrop click)
- *   onConfirm   {function}  — llamado al hacer clic en el botón de acción
- *   title       {string}
- *   message     {string}
- *   confirmText {string}    — texto del botón de acción (default: "Confirmar")
- *   variant     {'danger'|'info'} — cambia el color del botón de acción
- *   loading     {boolean}   — deshabilita el botón mientras se procesa
+ * Modal reutilizable usando <dialog> nativo con protección de dialog.open.
  */
 export default function Modal({
   isOpen,
@@ -26,18 +17,16 @@ export default function Modal({
 }) {
   const dialogRef = useRef(null)
 
-  // Abre o cierra el <dialog> nativo según isOpen
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
     if (isOpen) {
-      dialog.showModal()
+      if (!dialog.open) dialog.showModal()
     } else {
-      dialog.close()
+      if (dialog.open) dialog.close()
     }
   }, [isOpen])
 
-  // Cierra al hacer clic en el backdrop (fuera del contenido)
   const handleBackdropClick = (e) => {
     if (e.target === dialogRef.current) onClose()
   }
@@ -62,6 +51,7 @@ export default function Modal({
           </div>
           <h2 style={styles.title}>{title}</h2>
           <button
+            type="button"
             onClick={onClose}
             style={styles.closeBtn}
             aria-label="Cerrar"
@@ -76,6 +66,7 @@ export default function Modal({
         {/* Footer */}
         <div style={styles.footer}>
           <button
+            type="button"
             onClick={onClose}
             className="btn btn-ghost"
             disabled={loading}
@@ -83,11 +74,12 @@ export default function Modal({
             Cancelar
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             className={isDanger ? 'btn btn-danger' : 'btn btn-primary'}
             disabled={loading}
           >
-            {loading && <span style={styles.spinnerInline} aria-hidden="true" />}
+            {loading && <Spinner size="sm" color="currentColor" />}
             {confirmText}
           </button>
         </div>
@@ -100,16 +92,17 @@ const styles = {
   dialog: {
     width: '90vw',
     maxWidth: '420px',
+    margin: 'auto',
     background: 'none',
     border: 'none',
     padding: 0,
   },
   content: {
     background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
+    border: '1px solid var(--color-border-strong)',
     borderRadius: 'var(--radius-lg)',
     padding: '24px',
-    boxShadow: '0 20px 60px rgba(0,0,0,.6)',
+    boxShadow: '0 20px 48px rgba(0, 0, 0, 0.55)',
   },
   header: {
     display: 'flex',
@@ -121,7 +114,7 @@ const styles = {
     width: '36px',
     height: '36px',
     borderRadius: 'var(--radius-sm)',
-    background: isDanger ? 'rgba(248,81,73,.12)' : 'rgba(88,166,255,.12)',
+    background: isDanger ? 'rgba(239, 68, 68, 0.14)' : 'rgba(247, 148, 29, 0.14)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -129,7 +122,7 @@ const styles = {
   }),
   title: {
     flex: 1,
-    fontSize: '1rem',
+    fontSize: '1.05rem',
     fontWeight: 600,
     color: 'var(--color-text)',
   },
@@ -141,11 +134,10 @@ const styles = {
     padding: '4px',
     display: 'flex',
     borderRadius: 'var(--radius-sm)',
-    transition: 'color 150ms ease',
   },
   message: {
     color: 'var(--color-muted)',
-    fontSize: '0.9rem',
+    fontSize: '0.9375rem',
     lineHeight: 1.6,
     marginBottom: '24px',
   },
@@ -153,14 +145,5 @@ const styles = {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '10px',
-  },
-  spinnerInline: {
-    width: '14px',
-    height: '14px',
-    border: '2px solid rgba(255,255,255,.3)',
-    borderTopColor: '#fff',
-    borderRadius: '50%',
-    animation: 'spin 0.7s linear infinite',
-    display: 'inline-block',
   },
 }

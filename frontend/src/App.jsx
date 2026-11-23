@@ -1,13 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useAuthStore } from './stores/authStore'
-import AppShell      from './components/layout/AppShell'
-import LoginView     from './views/LoginView'
+import AppShell       from './components/layout/AppShell'
+import LoginView      from './views/LoginView'
 import InventarioView from './views/InventarioView'
-import KanbanView    from './views/KanbanView'
-import ModoSuperView from './views/ModoSuperView'
-import ProductosView from './views/ProductosView'
-import NotFoundView  from './views/NotFoundView'
+import KanbanView     from './views/KanbanView'
+import ModoSuperView  from './views/ModoSuperView'
+import ProductosView  from './views/ProductosView'
+import PerfilesView   from './views/PerfilesView'
+import NotFoundView   from './views/NotFoundView'
 
 /**
  * ProtectedRoute — Redirige al login si no hay token válido en el store.
@@ -27,7 +28,7 @@ export default function App() {
           style: {
             background: 'var(--color-surface)',
             color: 'var(--color-text)',
-            border: '1px solid var(--color-border)',
+            border: '1px solid var(--color-border-strong)',
             fontSize: '0.875rem',
           },
           success: { iconTheme: { primary: 'var(--color-success)', secondary: '#fff' } },
@@ -36,7 +37,7 @@ export default function App() {
       />
 
       <Routes>
-        {/* Ruta pública — Login */}
+        {/* Ruta pública — Login (PIN rápido o Contraseña) */}
         <Route path="/login" element={<LoginView />} />
 
         {/* Rutas protegidas — requieren JWT */}
@@ -49,10 +50,11 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/inventario" replace />} />
-          <Route path="inventario" element={<InventarioView />} />
-          <Route path="productos" element={<ProductosView />} />
-          <Route path="kanban"     element={<KanbanView />} />
+          <Route path="inventario"   element={<InventarioView />} />
+          <Route path="productos"    element={<ProductosView />} />
+          <Route path="kanban"       element={<KanbanView />} />
           <Route path="lista-compra" element={<ModoSuperView />} />
+          <Route path="perfiles"     element={<PerfilesView />} />
         </Route>
 
         {/* 404 */}
