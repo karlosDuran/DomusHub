@@ -1,17 +1,15 @@
 # Dependencies
 node_modules/
-vendor/
 
 # Environment
 .env
 .env.*
 !.env.example
 
-# Database
-*.db
-
-# Build artifacts
+# Build & AWS Lambda packages
 frontend/dist/
+backend/dist/
+*.zip
 
 # IDE
 .idea/
