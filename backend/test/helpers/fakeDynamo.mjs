@@ -45,12 +45,12 @@ export function installFakeDynamo(seed = {}) {
     if (setMatch) {
       for (const part of setMatch[1].split(', ')) {
         const [n, v] = part.split(' = ')
-        item[cmd.ExpressionAttributeNames[n]] = clone(cmd.ExpressionAttributeValues[v])
+        item[(cmd.ExpressionAttributeNames?.[n] ?? n)] = clone(cmd.ExpressionAttributeValues[v])
       }
     }
     const rmMatch = /REMOVE (.*)$/.exec(expr)
     if (rmMatch) {
-      for (const n of rmMatch[1].split(', ')) delete item[cmd.ExpressionAttributeNames[n]]
+      for (const n of rmMatch[1].split(', ')) delete item[(cmd.ExpressionAttributeNames?.[n] ?? n)]
     }
     return item
   }
