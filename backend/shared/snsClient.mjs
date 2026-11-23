@@ -3,6 +3,20 @@ import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
 export const sns = new SNSClient({})
 
 /**
+ * SNS exige que el Subject sea una sola línea, ASCII imprimible y < 100 caracteres:
+ * se quitan acentos/emojis para que nunca falle el envío por un título con "ñ" o "á".
+ */
+export function toSnsSubject(subject) {
+  return String(subject)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 99)
+}
+
+/**
  * Publica una notificación en un tópico SNS.
  *
  * Cuando se indica `destinatario` se envía como MessageAttribute para que las
@@ -20,8 +34,7 @@ export async function publishNotification({ topicArn, subject, message, destinat
   try {
     await sns.send(new PublishCommand({
       TopicArn: topicArn,
-      // SNS exige Subject en una sola línea, ASCII imprimible y <= 100 caracteres.
-      Subject: String(subject).replace(/[\r\n]+/g, ' ').slice(0, 100),
+      Subject: toSnsSubject(subject),
       Message: message,
       ...(destinatario
         ? {
