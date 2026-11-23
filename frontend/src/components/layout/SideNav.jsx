@@ -1,25 +1,37 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Package, Columns3, ShoppingCart, LogOut, Home, BookOpen, Users } from 'lucide-react'
+import {
+  Package,
+  Columns3,
+  ShoppingCart,
+  LogOut,
+  Home,
+  BookOpen,
+  Users,
+  Sun,
+  Moon,
+} from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuthStore } from '../../stores/authStore'
 import { useInventarioStore } from '../../stores/inventarioStore'
+import { useThemeStore } from '../../stores/themeStore'
 
 const links = [
-  { to: '/inventario',   label: 'Despensa',        Icon: Package },
-  { to: '/productos',    label: 'Catálogo',        Icon: BookOpen },
-  { to: '/kanban',       label: 'Tareas Kanban',   Icon: Columns3 },
-  { to: '/lista-compra', label: 'Modo Súper',      Icon: ShoppingCart },
-  { to: '/perfiles',     label: 'Familia y PIN',   Icon: Users },
+  { to: '/inventario',   label: 'Despensa',       Icon: Package },
+  { to: '/productos',    label: 'Catálogo',       Icon: BookOpen },
+  { to: '/kanban',       label: 'Tareas Kanban',  Icon: Columns3 },
+  { to: '/lista-compra', label: 'Modo Súper',     Icon: ShoppingCart },
+  { to: '/perfiles',     label: 'Familia y PIN',  Icon: Users },
 ]
 
 /**
- * Barra lateral de navegación fija.
- * Solo visible en desktop (>= 768px).
+ * Barra lateral fija (desktop >= 768px) sobre superficie cálida secundaria.
  */
 export default function SideNav() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const resetInventario = useInventarioStore((s) => s.reset)
+  const theme = useThemeStore((s) => s.theme)
+  const toggleTheme = useThemeStore((s) => s.toggleTheme)
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -30,186 +42,90 @@ export default function SideNav() {
   }
 
   return (
-    <aside id="side-nav" style={styles.nav} aria-label="Navegación lateral">
-      {/* Logo */}
-      <div style={styles.logoArea}>
-        <div style={styles.logoIcon}>
-          <Home size={20} color="var(--color-accent)" />
+    <aside
+      id="side-nav"
+      aria-label="Navegación lateral"
+      className="fixed inset-y-0 left-0 z-40 hidden w-[var(--sidenav-width)] flex-col border-r border-[var(--color-border)] bg-[var(--color-surface-subtle)] md:flex"
+    >
+      {/* Marca */}
+      <div className="flex items-center justify-between gap-2 px-5 pt-5 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent)] text-[var(--color-accent-ink)]">
+            <Home size={18} strokeWidth={2.1} />
+          </div>
+          <div>
+            <span className="block text-[1.05rem] font-bold leading-tight tracking-[-0.02em] text-[var(--color-text)]">
+              HomeOps
+            </span>
+            <span className="block text-[11px] font-medium text-[var(--color-muted)]">
+              Gestión del hogar
+            </span>
+          </div>
         </div>
-        <div>
-          <span style={styles.logoText}>HomeOps</span>
-          <span style={styles.logoTag}>CRM Familiar · AWS</span>
-        </div>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="btn-icon border border-[var(--color-border)] bg-[var(--color-surface)]"
+          aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
       </div>
 
-      {/* Links */}
-      <nav style={styles.links}>
+      {/* Navegación principal */}
+      <nav className="flex flex-1 flex-col gap-1 px-3 py-2">
         {links.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
-            style={({ isActive }) => ({
-              ...styles.link,
-              background: isActive ? 'rgba(247, 148, 29, 0.12)' : 'transparent',
-              color: isActive ? 'var(--color-accent)' : 'var(--color-muted)',
-              borderLeft: isActive
-                ? '3px solid var(--color-accent)'
-                : '3px solid transparent',
-            })}
+            className={({ isActive }) =>
+              [
+                'flex min-h-[42px] items-center gap-3 rounded-xl px-3.5 text-sm font-medium transition-[background-color,color,border-color] duration-150',
+                isActive
+                  ? 'border border-[var(--color-border)] bg-[var(--color-surface)] font-semibold text-[var(--color-accent)]'
+                  : 'border border-transparent text-[var(--color-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]',
+              ].join(' ')
+            }
           >
-            <Icon size={18} strokeWidth={1.9} />
-            <span>{label}</span>
+            {({ isActive }) => (
+              <>
+                <Icon size={18} strokeWidth={isActive ? 2.1 : 1.75} className="shrink-0" />
+                <span>{label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
 
       {/* Usuario + Logout */}
-      <div style={styles.footer}>
-        <div style={styles.userInfo}>
-          <div
-            style={{
-              ...styles.avatar,
-              background: user?.avatar_color || 'var(--color-accent)',
-            }}
-          >
-            {user?.nombre?.[0]?.toUpperCase() ?? 'U'}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <p style={styles.userName}>{user?.nombre ?? 'Usuario'}</p>
-            <p style={styles.userRole}>
-              {user?.rol === 'admin' ? 'Administrador' : 'Integrante familiar'}
-            </p>
-          </div>
+      <div className="flex items-center gap-2.5 border-t border-[var(--color-border)] px-4 py-3.5">
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+          style={{ backgroundColor: user?.avatar_color || 'var(--color-accent)' }}
+        >
+          {user?.nombre?.[0]?.toUpperCase() ?? 'U'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-[var(--color-text)]">
+            {user?.nombre ?? 'Usuario'}
+          </p>
+          <p className="text-xs text-[var(--color-muted)]">
+            {user?.rol === 'admin' ? 'Administrador' : 'Integrante'}
+          </p>
         </div>
         <button
           id="sidenav-logout"
           type="button"
           onClick={handleLogout}
-          style={styles.logoutBtn}
+          className="btn-icon btn-icon-danger shrink-0"
           aria-label="Cerrar sesión"
           title="Cerrar sesión"
         >
-          <LogOut size={18} />
+          <LogOut size={17} />
         </button>
       </div>
     </aside>
   )
-}
-
-const styles = {
-  nav: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: 'var(--sidenav-width)',
-    height: '100dvh',
-    display: 'flex',
-    flexDirection: 'column',
-    background: 'var(--color-surface)',
-    borderRight: '1px solid var(--color-border)',
-    zIndex: 100,
-  },
-  logoArea: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '20px 20px 18px',
-    borderBottom: '1px solid var(--color-border)',
-  },
-  logoIcon: {
-    width: '38px',
-    height: '38px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'rgba(247, 148, 29, 0.14)',
-    border: '1px solid rgba(247, 148, 29, 0.3)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  logoText: {
-    display: 'block',
-    fontWeight: 700,
-    fontSize: '1.08rem',
-    color: 'var(--color-text)',
-    letterSpacing: '-0.02em',
-    lineHeight: 1.2,
-  },
-  logoTag: {
-    display: 'block',
-    fontSize: '0.73rem',
-    color: 'var(--color-muted)',
-    fontWeight: 500,
-  },
-  links: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    padding: '16px 12px',
-    flex: 1,
-  },
-  link: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    minHeight: '44px',
-    padding: '10px 12px',
-    borderRadius: 'var(--radius-sm)',
-    textDecoration: 'none',
-    fontSize: '0.92rem',
-    fontWeight: 500,
-    transition: 'all 150ms var(--ease)',
-  },
-  footer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '16px 14px',
-    borderTop: '1px solid var(--color-border)',
-  },
-  userInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    flex: 1,
-    overflow: 'hidden',
-  },
-  avatar: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 700,
-    fontSize: '0.9rem',
-    color: '#fff',
-    flexShrink: 0,
-  },
-  userName: {
-    fontSize: '0.88rem',
-    fontWeight: 600,
-    color: 'var(--color-text)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  userRole: {
-    fontSize: '0.75rem',
-    color: 'var(--color-muted)',
-  },
-  logoutBtn: {
-    width: '38px',
-    height: '38px',
-    background: 'transparent',
-    border: '1px solid var(--color-border)',
-    cursor: 'pointer',
-    color: 'var(--color-muted)',
-    borderRadius: 'var(--radius-sm)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'color 150ms ease, background 150ms ease',
-    flexShrink: 0,
-  },
 }

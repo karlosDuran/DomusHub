@@ -1,13 +1,9 @@
 /**
- * Spinner de carga SVG animado.
- *
- * Props:
- *   size  {'sm'|'md'|'lg'}  — sm=16px, md=24px, lg=40px
- *   color {string}          — color del arco (default: var(--color-accent))
+ * Spinner SVG ligero y rápido (0.65s para mejor percepción de velocidad).
  */
 export default function Spinner({ size = 'md', color = 'var(--color-accent)' }) {
-  const dim = { sm: 16, md: 24, lg: 40 }[size] ?? 24
-  const stroke = { sm: 2, md: 2.5, lg: 3 }[size] ?? 2.5
+  const dim = { sm: 16, md: 22, lg: 36 }[size] ?? 22
+  const stroke = { sm: 2, md: 2.25, lg: 2.75 }[size] ?? 2.25
   const r = (dim - stroke * 2) / 2
 
   return (
@@ -18,17 +14,17 @@ export default function Spinner({ size = 'md', color = 'var(--color-accent)' }) 
       fill="none"
       role="status"
       aria-label="Cargando"
-      style={{ animation: 'spin 0.8s linear infinite', display: 'inline-block', flexShrink: 0 }}
+      className="inline-block shrink-0"
+      style={{ animation: 'spin 0.65s linear infinite' }}
     >
-      {/* Pista */}
       <circle
         cx={dim / 2}
         cy={dim / 2}
         r={r}
-        stroke="var(--color-border)"
+        stroke="currentColor"
+        strokeOpacity="0.18"
         strokeWidth={stroke}
       />
-      {/* Arco animado */}
       <circle
         cx={dim / 2}
         cy={dim / 2}
@@ -36,8 +32,7 @@ export default function Spinner({ size = 'md', color = 'var(--color-accent)' }) 
         stroke={color}
         strokeWidth={stroke}
         strokeLinecap="round"
-        strokeDasharray={`${r * 1.5} ${r * 100}`}
-        strokeDashoffset="0"
+        strokeDasharray={`${r * 1.65} ${r * 100}`}
         transform={`rotate(-90 ${dim / 2} ${dim / 2})`}
       />
     </svg>

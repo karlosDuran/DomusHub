@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Users,
   Plus,
@@ -9,27 +9,31 @@ import {
   ShieldCheck,
   AlertTriangle,
   RefreshCw,
-  X,
   BellRing,
+  CheckCircle2,
+  Clock,
+  Send,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import api from '../api/axiosInstance'
 import { useAuthStore } from '../stores/authStore'
+import DialogShell from '../components/ui/DialogShell'
 import Modal from '../components/ui/Modal'
+import Spinner from '../components/ui/Spinner'
 
-// Paleta de avatares sin tonos violeta/lavanda (cumple design-taste-frontend y COLOR_RE del backend)
+// Paleta de avatares cálida y botánica (compatible con COLOR_RE del backend)
 const AVATAR_SWATCHES = [
-  '#2a9d8f',
-  '#e76f51',
-  '#f4a261',
-  '#457b9d',
-  '#6a994e',
-  '#e9c46a',
+  '#2D6A4F',
+  '#3A6A85',
+  '#B86E14',
+  '#C45D47',
+  '#6A8A4E',
+  '#5C6B73',
 ]
 
-function PerfilModal({ isOpen, onClose, onSave, usuario, currentUserId }) {
-  const dialogRef = useRef(null)
+function PerfilModal({ isOpen, onClose, onSave, usuario, currentUserId, esAdmin }) {
   const isEdit = !!usuario
+  const soloEdicionPropia = isEdit && !esAdmin
 
   const [form, setForm] = useState({
     nombre: '',
@@ -44,48 +48,33 @@ function PerfilModal({ isOpen, onClose, onSave, usuario, currentUserId }) {
 
   useEffect(() => {
     const sync = async () => {
-      if (isOpen) {
-        if (usuario) {
-          setForm({
-            nombre: usuario.nombre ?? '',
-            email: usuario.email ?? '',
-            rol: usuario.rol ?? 'miembro',
-            password: '',
-            pin: '',
-            quitarPin: false,
-            avatar_color: AVATAR_SWATCHES.includes(usuario.avatar_color)
-              ? usuario.avatar_color
-              : AVATAR_SWATCHES[0],
-          })
-        } else {
-          setForm({
-            nombre: '',
-            email: '',
-            rol: 'miembro',
-            password: '',
-            pin: '',
-            quitarPin: false,
-            avatar_color: AVATAR_SWATCHES[0],
-          })
-        }
+      if (!isOpen) return
+      if (usuario) {
+        setForm({
+          nombre: usuario.nombre ?? '',
+          email: usuario.email ?? '',
+          rol: usuario.rol ?? 'miembro',
+          password: '',
+          pin: '',
+          quitarPin: false,
+          avatar_color: AVATAR_SWATCHES.includes(usuario.avatar_color)
+            ? usuario.avatar_color
+            : AVATAR_SWATCHES[0],
+        })
+      } else {
+        setForm({
+          nombre: '',
+          email: '',
+          rol: 'miembro',
+          password: '',
+          pin: '',
+          quitarPin: false,
+          avatar_color: AVATAR_SWATCHES[0],
+        })
       }
     }
     sync()
   }, [isOpen, usuario])
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (isOpen) {
-      if (!dialog.open) dialog.showModal()
-    } else {
-      if (dialog.open) dialog.close()
-    }
-  }, [isOpen])
-
-  const handleBackdropClick = (e) => {
-    if (e.target === dialogRef.current) onClose()
-  }
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -119,12 +108,17 @@ function PerfilModal({ isOpen, onClose, onSave, usuario, currentUserId }) {
       return
     }
 
-    const payload = {
-      nombre: form.nombre.trim(),
-      email: form.email.trim(),
-      rol: form.rol,
-      avatar_color: form.avatar_color,
-    }
+    const payload = soloEdicionPropia
+      ? {
+          email: form.email.trim(),
+          avatar_color: form.avatar_color,
+        }
+      : {
+          nombre: form.nombre.trim(),
+          email: form.email.trim(),
+          rol: form.rol,
+          avatar_color: form.avatar_color,
+        }
     if (form.password) {
       payload.password = form.password
     }
@@ -149,173 +143,164 @@ function PerfilModal({ isOpen, onClose, onSave, usuario, currentUserId }) {
   const esPropioUsuario = isEdit && String(usuario?.id) === String(currentUserId)
 
   return (
-    <dialog
-      ref={dialogRef}
-      onClick={handleBackdropClick}
+    <DialogShell
+      isOpen={isOpen}
       onClose={onClose}
-      style={styles.dialog}
-    >
-      <div style={styles.modalContent} className="animate-scale-in">
-        <div style={styles.modalHeader}>
-          <div style={styles.iconWrap}>
-            <Users size={20} color="var(--color-accent)" />
-          </div>
-          <h2 style={styles.modalTitle}>
-            {isEdit ? `Editar a ${usuario.nombre}` : 'Nuevo Integrante Familiar'}
-          </h2>
-          <button type="button" onClick={onClose} style={styles.closeBtn} aria-label="Cerrar">
-            <X size={18} />
+      title={isEdit ? `Editar a ${usuario.nombre}` : 'Nuevo integrante'}
+      icon={<Users size={18} />}
+      maxWidth="max-w-[480px]"
+      footer={
+        <>
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>
+            Cancelar
           </button>
+          <button
+            type="submit"
+            form="perfil-form"
+            className="btn btn-primary"
+            disabled={submitting}
+          >
+            {submitting && <Spinner size="sm" color="currentColor" />}
+            {isEdit ? 'Guardar cambios' : 'Crear integrante'}
+          </button>
+        </>
+      }
+    >
+      <form id="perfil-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="perfil-nombre" className="text-xs font-medium text-[var(--color-muted)]">
+            Nombre *
+          </label>
+          <input
+            id="perfil-nombre"
+            name="nombre"
+            type="text"
+            className="input"
+            placeholder="Ej. Mamá, Papá, Fer, Ana"
+            value={form.nombre}
+            onChange={handleChange}
+            required
+            disabled={submitting || soloEdicionPropia}
+          />
         </div>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Nombre */}
-          <div style={styles.fieldGroup}>
-            <label htmlFor="perfil-nombre" style={styles.label}>
-              Nombre *
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="perfil-email" className="text-xs font-medium text-[var(--color-muted)]">
+            Correo electrónico para avisos SNS
+          </label>
+          <input
+            id="perfil-email"
+            name="email"
+            type="email"
+            className="input"
+            placeholder="integrante@ejemplo.com"
+            value={form.email}
+            onChange={handleChange}
+            disabled={submitting}
+          />
+          <p className="text-[11px] leading-relaxed text-[var(--color-muted)]">
+            Al guardar, HomeOps suscribe este correo en Amazon SNS para recibir tus avisos de
+            tareas, turnos de basura y alertas de despensa.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="perfil-rol" className="text-xs font-medium text-[var(--color-muted)]">
+              Rol en el hogar
             </label>
-            <input
-              id="perfil-nombre"
-              name="nombre"
-              type="text"
+            <select
+              id="perfil-rol"
+              name="rol"
               className="input"
-              placeholder="Ej. Mamá, Papá, Fer, Ana"
-              value={form.nombre}
+              value={form.rol}
               onChange={handleChange}
-              required
-              disabled={submitting}
-            />
+              disabled={submitting || esPropioUsuario || soloEdicionPropia}
+            >
+              <option value="miembro">Integrante</option>
+              <option value="admin">Administrador</option>
+            </select>
           </div>
 
-          {/* Email para SNS */}
-          <div style={styles.fieldGroup}>
-            <label htmlFor="perfil-email" style={styles.label}>
-              Correo electrónico (para alertas de Amazon SNS)
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="perfil-pin" className="text-xs font-medium text-[var(--color-muted)]">
+              {isEdit ? 'Nuevo PIN (4 dígitos)' : 'PIN rápido (4 dígitos)'}
             </label>
             <input
-              id="perfil-email"
-              name="email"
-              type="email"
-              className="input"
-              placeholder="integrante@ejemplo.com"
-              value={form.email}
-              onChange={handleChange}
-              disabled={submitting}
-            />
-          </div>
-
-          <div style={styles.row}>
-            {/* Rol */}
-            <div style={{ ...styles.fieldGroup, flex: 1 }}>
-              <label htmlFor="perfil-rol" style={styles.label}>
-                Rol en el hogar
-              </label>
-              <select
-                id="perfil-rol"
-                name="rol"
-                className="input"
-                value={form.rol}
-                onChange={handleChange}
-                disabled={submitting || esPropioUsuario}
-                style={{ appearance: 'auto' }}
-              >
-                <option value="miembro">Integrante (Miembro)</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </div>
-
-            {/* PIN 4 dígitos */}
-            <div style={{ ...styles.fieldGroup, flex: 1 }}>
-              <label htmlFor="perfil-pin" style={styles.label}>
-                {isEdit ? 'Nuevo PIN (4 dígitos)' : 'PIN rápido (4 dígitos)'}
-              </label>
-              <input
-                id="perfil-pin"
-                name="pin"
-                type="password"
-                inputMode="numeric"
-                maxLength={4}
-                className="input font-mono-num"
-                placeholder={isEdit && usuario?.tiene_pin ? '•••• (actual activo)' : 'Ej. 1234'}
-                value={form.pin}
-                onChange={handlePinChange}
-                disabled={submitting}
-              />
-            </div>
-          </div>
-
-          {isEdit && usuario?.tiene_pin && (
-            <label style={styles.checkboxRow}>
-              <input
-                type="checkbox"
-                name="quitarPin"
-                checked={form.quitarPin}
-                onChange={handleChange}
-                disabled={submitting}
-                style={{ accentColor: 'var(--color-accent)' }}
-              />
-              <span>Desactivar PIN de acceso rápido para este integrante</span>
-            </label>
-          )}
-
-          {/* Contraseña */}
-          <div style={styles.fieldGroup}>
-            <label htmlFor="perfil-password" style={styles.label}>
-              {isEdit ? 'Nueva contraseña (dejar vacío para mantener la actual)' : 'Contraseña (mín. 6 caracteres) *'}
-            </label>
-            <input
-              id="perfil-password"
-              name="password"
+              id="perfil-pin"
+              name="pin"
               type="password"
-              className="input"
-              placeholder="••••••••"
-              value={form.password}
-              onChange={handleChange}
-              required={!isEdit}
+              inputMode="numeric"
+              maxLength={4}
+              className="input font-mono-num"
+              placeholder={isEdit && usuario?.tiene_pin ? '•••• (activo)' : 'Ej. 1234'}
+              value={form.pin}
+              onChange={handlePinChange}
               disabled={submitting}
             />
           </div>
+        </div>
 
-          {/* Color de avatar */}
-          <div style={styles.fieldGroup}>
-            <span style={styles.label}>Color de avatar</span>
-            <div style={styles.swatchRow}>
-              {AVATAR_SWATCHES.map((hex) => (
+        {isEdit && usuario?.tiene_pin && (
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--color-text)]">
+            <input
+              type="checkbox"
+              name="quitarPin"
+              checked={form.quitarPin}
+              onChange={handleChange}
+              disabled={submitting}
+              className="h-4 w-4 cursor-pointer accent-[var(--color-accent)]"
+            />
+            <span>Desactivar PIN de acceso rápido</span>
+          </label>
+        )}
+
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor="perfil-password"
+            className="text-xs font-medium text-[var(--color-muted)]"
+          >
+            {isEdit
+              ? 'Nueva contraseña (opcional)'
+              : 'Contraseña (mín. 6 caracteres) *'}
+          </label>
+          <input
+            id="perfil-password"
+            name="password"
+            type="password"
+            className="input"
+            placeholder="••••••••"
+            value={form.password}
+            onChange={handleChange}
+            required={!isEdit}
+            disabled={submitting}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-[var(--color-muted)]">Color de avatar</span>
+          <div className="flex items-center gap-2.5">
+            {AVATAR_SWATCHES.map((hex) => {
+              const selected = form.avatar_color === hex
+              return (
                 <button
                   key={hex}
                   type="button"
                   onClick={() => setForm((prev) => ({ ...prev, avatar_color: hex }))}
                   aria-label={`Color ${hex}`}
+                  className="h-8 w-8 cursor-pointer rounded-full border-none transition-transform duration-150 active:scale-90"
                   style={{
-                    ...styles.swatchBtn,
-                    background: hex,
-                    outline:
-                      form.avatar_color === hex
-                        ? '2px solid var(--color-text)'
-                        : '2px solid transparent',
+                    backgroundColor: hex,
+                    outline: selected ? '2px solid var(--color-text)' : '2px solid transparent',
                     outlineOffset: '2px',
                   }}
                 />
-              ))}
-            </div>
+              )
+            })}
           </div>
-
-          <div style={styles.modalFooter}>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={onClose}
-              disabled={submitting}
-            >
-              Cancelar
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {isEdit ? 'Guardar Cambios' : 'Crear Integrante'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </dialog>
+        </div>
+      </form>
+    </DialogShell>
   )
 }
 
@@ -331,6 +316,7 @@ export default function PerfilesView() {
   const [modalPerfil, setModalPerfil] = useState({ open: false, usuario: null })
   const [modalEliminar, setModalEliminar] = useState({ open: false, usuario: null })
   const [loadingDelete, setLoadingDelete] = useState(false)
+  const [reenviandoId, setReenviandoId] = useState(null)
 
   const fetchUsuarios = async () => {
     try {
@@ -355,9 +341,7 @@ export default function PerfilesView() {
   const handleSavePerfil = async (payload) => {
     if (modalPerfil.usuario) {
       const { data } = await api.put(`/protected/usuarios/${modalPerfil.usuario.id}`, payload)
-      setUsuarios((prev) =>
-        prev.map((u) => (String(u.id) === String(data.id) ? data : u))
-      )
+      setUsuarios((prev) => prev.map((u) => (String(u.id) === String(data.id) ? data : u)))
       if (String(data.id) === String(currentUser?.id)) {
         updateUser({
           nombre: data.nombre,
@@ -365,13 +349,38 @@ export default function PerfilesView() {
           avatar_color: data.avatar_color,
         })
       }
-      toast.success('Perfil familiar actualizado')
+      if (data.sns_estado === 'pendiente') {
+        toast.success(`Perfil actualizado. Revisa ${data.email} para confirmar el correo de AWS SNS.`)
+      } else {
+        toast.success('Perfil familiar actualizado')
+      }
     } else {
       const { data } = await api.post('/protected/usuarios', payload)
       setUsuarios((prev) =>
         [...prev, data].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
       )
-      toast.success('Integrante familiar creado')
+      if (data.sns_estado === 'pendiente') {
+        toast.success(`Integrante creado. Revisa ${data.email} para confirmar el correo de AWS SNS.`)
+      } else {
+        toast.success('Integrante familiar creado')
+      }
+    }
+  }
+
+  const handleSuscribirSns = async (usuario) => {
+    setReenviandoId(usuario.id)
+    try {
+      const { data } = await api.post(`/protected/usuarios/${usuario.id}/sns-suscribir`)
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          String(u.id) === String(usuario.id) ? { ...u, sns_estado: data.sns_estado } : u
+        )
+      )
+      toast.success(data.message)
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? 'No se pudo activar la suscripción SNS.')
+    } finally {
+      setReenviandoId(null)
     }
   }
 
@@ -393,12 +402,11 @@ export default function PerfilesView() {
   }
 
   return (
-    <div id="perfiles-page" style={styles.page}>
-      {/* Header */}
-      <header style={styles.header}>
+    <div id="perfiles-page" className="mx-auto max-w-[1120px]">
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 style={styles.pageTitle}>Integrantes y Acceso PIN</h1>
-          <p style={styles.pageSubtitle}>
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">Familia y acceso PIN</h1>
+          <p className="mt-0.5 text-sm text-[var(--color-muted)]">
             {loading
               ? 'Cargando perfiles…'
               : `${usuarios.length} integrante${usuarios.length !== 1 ? 's' : ''} registrado${usuarios.length !== 1 ? 's' : ''}`}
@@ -411,117 +419,170 @@ export default function PerfilesView() {
             className="btn btn-primary"
             onClick={() => setModalPerfil({ open: true, usuario: null })}
           >
-            <Plus size={18} /> Nuevo Integrante
+            <Plus size={17} /> Nuevo integrante
           </button>
         )}
       </header>
 
-      {/* Aviso de suscripción SNS */}
-      <div className="card m-nolift" style={styles.snsNotice}>
-        <div style={styles.snsIconWrap}>
-          <BellRing size={18} color="var(--color-accent)" />
+      {/* Callout SNS */}
+      <div className="mb-6 flex items-start gap-3.5 rounded-2xl border border-[var(--color-accent-border)] bg-[var(--color-accent-soft)] p-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface)] text-[var(--color-accent)]">
+          <BellRing size={17} />
         </div>
-        <div style={{ flex: 1 }}>
-          <p style={styles.snsTitle}>Notificaciones Familiares en Amazon SNS</p>
-          <p style={styles.snsText}>
-            Para que cada integrante reciba alertas automáticas de stock crítico del súper y recordatorios de
-            tareas o turnos de basura, registra su correo aquí y confirma el enlace de
-            <strong> AWS Notification - Subscription Confirmation</strong> enviado a su bandeja de entrada.
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-[var(--color-text)]">
+            Notificaciones familiares por correo (Amazon SNS)
+          </p>
+          <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-[var(--color-muted)]">
+            Registra el correo de cada integrante para recibir alertas de stock crítico y
+            recordatorios de tareas o turnos de basura. Cada persona debe confirmar el enlace de{' '}
+            <strong className="font-semibold text-[var(--color-text)]">
+              AWS Notification - Subscription Confirmation
+            </strong>{' '}
+            en su bandeja de entrada.
           </p>
         </div>
       </div>
 
-      {/* Estado: cargando */}
+      {/* Cargando */}
       {loading && (
-        <div style={styles.grid}>
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="skeleton" style={{ height: '128px' }} />
+            <div key={i} className="skeleton h-32 rounded-xl" />
           ))}
         </div>
       )}
 
-      {/* Estado: error */}
+      {/* Error */}
       {!loading && error && (
-        <div style={styles.centerState}>
-          <AlertTriangle size={32} color="var(--color-danger)" />
-          <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>Error al cargar perfiles</p>
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>{error}</p>
-          <button type="button" className="btn btn-ghost" onClick={fetchUsuarios}>
-            <RefreshCw size={16} /> Reintentar
+        <div className="animate-fade-in flex flex-col items-center gap-2 py-14 text-center">
+          <AlertTriangle size={28} className="text-[var(--color-danger)]" />
+          <p className="font-semibold text-[var(--color-danger-text)]">Error al cargar perfiles</p>
+          <p className="text-sm text-[var(--color-muted)]">{error}</p>
+          <button type="button" className="btn btn-ghost mt-2" onClick={fetchUsuarios}>
+            <RefreshCw size={15} /> Reintentar
           </button>
         </div>
       )}
 
       {/* Grid de integrantes */}
       {!loading && !error && (
-        <div style={styles.grid}>
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {usuarios.map((u) => {
             const esActual = String(u.id) === String(currentUser?.id)
             return (
-              <article key={u.id} className="card animate-fade-in-up" style={styles.card}>
-                <div style={styles.cardTop}>
+              <article
+                key={u.id}
+                className="surface-card surface-card-interactive group flex flex-col gap-3.5 p-4"
+              >
+                <div className="flex items-start gap-3">
                   <div
-                    style={{
-                      ...styles.avatar,
-                      background: u.avatar_color || 'var(--color-accent)',
-                    }}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base font-bold text-white"
+                    style={{ backgroundColor: u.avatar_color || 'var(--color-accent)' }}
                   >
                     {u.nombre?.[0]?.toUpperCase() ?? 'U'}
                   </div>
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <h3 style={styles.userName}>{u.nombre}</h3>
-                      {esActual && <span className="badge badge-neutral">Tú</span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h3 className="truncate text-[0.98rem] font-semibold text-[var(--color-text)]">
+                        {u.nombre}
+                      </h3>
+                      {esActual && <span className="badge badge-neutral text-[11px]">Tú</span>}
                     </div>
-                    <div style={styles.badgesRow}>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <span
-                        className={`badge ${u.rol === 'admin' ? 'badge-warning' : 'badge-neutral'}`}
+                        className={`badge text-[11px] ${u.rol === 'admin' ? 'badge-warning' : 'badge-neutral'}`}
                       >
-                        <ShieldCheck size={12} />
-                        {u.rol === 'admin' ? 'Admin' : 'Miembro'}
+                        <ShieldCheck size={11} />
+                        {u.rol === 'admin' ? 'Admin' : 'Integrante'}
                       </span>
                       <span
-                        className={`badge ${u.tiene_pin ? 'badge-success' : 'badge-neutral'}`}
+                        className={`badge text-[11px] ${u.tiene_pin ? 'badge-success' : 'badge-neutral'}`}
                       >
-                        <KeyRound size={12} />
-                        {u.tiene_pin ? 'PIN 4 dígitos' : 'Sin PIN'}
+                        <KeyRound size={11} />
+                        {u.tiene_pin ? 'PIN activo' : 'Sin PIN'}
                       </span>
                     </div>
                   </div>
 
-                  {esAdmin && (
-                    <div className="actions" style={styles.actions}>
+                  {(esAdmin || esActual) && (
+                    <div className="flex shrink-0 items-center gap-0.5 md:opacity-65 md:transition-opacity md:duration-150 md:group-hover:opacity-100">
                       <button
                         type="button"
                         onClick={() => setModalPerfil({ open: true, usuario: u })}
-                        style={styles.actionBtn}
+                        className="btn-icon h-8 w-8"
                         title={`Editar a ${u.nombre}`}
                         aria-label={`Editar a ${u.nombre}`}
                       >
-                        <Pencil size={15} />
+                        <Pencil size={14} />
                       </button>
-                      {!esActual && (
+                      {esAdmin && !esActual && (
                         <button
                           type="button"
                           onClick={() => setModalEliminar({ open: true, usuario: u })}
-                          className="action-btn-danger"
-                          style={styles.actionBtn}
+                          className="btn-icon btn-icon-danger h-8 w-8"
                           title={`Eliminar a ${u.nombre}`}
                           aria-label={`Eliminar a ${u.nombre}`}
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={14} />
                         </button>
                       )}
                     </div>
                   )}
                 </div>
 
-                <div style={styles.emailRow}>
-                  <Mail size={14} color="var(--color-muted)" />
-                  <span style={styles.emailText}>
-                    {u.email || 'Sin correo configurado para alertas SNS'}
-                  </span>
+                <div className="flex flex-col gap-2 border-t border-[var(--color-border)] pt-2.5 text-xs text-[var(--color-muted)]">
+                  <div className="flex items-center gap-2">
+                    <Mail size={13} className="shrink-0" />
+                    <span className="truncate">
+                      {u.email || 'Sin correo configurado para alertas'}
+                    </span>
+                  </div>
+
+                  {u.email && (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      {u.sns_estado === 'confirmado' && (
+                        <span className="badge badge-success text-[11px]">
+                          <CheckCircle2 size={11} /> Avisos SNS activos
+                        </span>
+                      )}
+                      {u.sns_estado === 'pendiente' && (
+                        <span className="badge badge-warning text-[11px]">
+                          <Clock size={11} /> Pendiente confirmar correo
+                        </span>
+                      )}
+                      {u.sns_estado === 'no_suscrito' && (
+                        <span className="badge badge-neutral text-[11px]">
+                          <BellRing size={11} /> Avisos sin activar
+                        </span>
+                      )}
+                      {u.sns_estado === 'error' && (
+                        <span className="badge badge-danger text-[11px]">
+                          <AlertTriangle size={11} /> Error al suscribir
+                        </span>
+                      )}
+
+                      {(esAdmin || esActual) &&
+                        (u.sns_estado === 'pendiente' ||
+                          u.sns_estado === 'no_suscrito' ||
+                          u.sns_estado === 'error') && (
+                          <button
+                            type="button"
+                            onClick={() => handleSuscribirSns(u)}
+                            disabled={reenviandoId === u.id}
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface2)] px-2 py-1 text-[11px] font-medium text-[var(--color-text)] transition-colors hover:border-[var(--color-accent-border)] hover:text-[var(--color-accent)] disabled:opacity-50"
+                          >
+                            {reenviandoId === u.id ? (
+                              <Spinner size="sm" color="currentColor" />
+                            ) : (
+                              <Send size={11} />
+                            )}
+                            {u.sns_estado === 'pendiente' ? 'Reenviar' : 'Activar avisos'}
+                          </button>
+                        )}
+                    </div>
+                  )}
                 </div>
               </article>
             )
@@ -529,248 +590,25 @@ export default function PerfilesView() {
         </div>
       )}
 
-      {/* Modal Crear / Editar Perfil */}
       <PerfilModal
         isOpen={modalPerfil.open}
         onClose={() => setModalPerfil({ open: false, usuario: null })}
         onSave={handleSavePerfil}
         usuario={modalPerfil.usuario}
         currentUserId={currentUser?.id}
+        esAdmin={esAdmin}
       />
 
-      {/* Modal Confirmar Eliminación */}
       <Modal
         isOpen={modalEliminar.open}
         onClose={() => setModalEliminar({ open: false, usuario: null })}
         onConfirm={handleConfirmEliminar}
-        title="Eliminar Integrante"
-        message={`¿Estás seguro de que deseas eliminar el perfil de "${modalEliminar.usuario?.nombre}"?`}
+        title="Eliminar integrante"
+        message={`¿Seguro que deseas eliminar el perfil de "${modalEliminar.usuario?.nombre}"?`}
         confirmText="Eliminar"
         variant="danger"
         loading={loadingDelete}
       />
     </div>
   )
-}
-
-const styles = {
-  page: {
-    maxWidth: '820px',
-    margin: '0 auto',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: '16px',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-  },
-  pageTitle: {
-    fontSize: '1.6rem',
-    fontWeight: 700,
-    color: 'var(--color-text)',
-  },
-  pageSubtitle: {
-    color: 'var(--color-muted)',
-    fontSize: '0.875rem',
-    marginTop: '2px',
-  },
-  snsNotice: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '14px',
-    padding: '16px 18px',
-    marginBottom: '22px',
-    borderColor: 'rgba(247, 148, 29, 0.3)',
-  },
-  snsIconWrap: {
-    width: '36px',
-    height: '36px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'rgba(247, 148, 29, 0.14)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  snsTitle: {
-    fontSize: '0.92rem',
-    fontWeight: 600,
-    color: 'var(--color-text)',
-    marginBottom: '4px',
-  },
-  snsText: {
-    fontSize: '0.84rem',
-    color: 'var(--color-muted)',
-    lineHeight: 1.5,
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '14px',
-  },
-  card: {
-    padding: '18px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
-  },
-  cardTop: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '12px',
-  },
-  avatar: {
-    width: '44px',
-    height: '44px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '1.1rem',
-    fontWeight: 700,
-    color: '#fff',
-    flexShrink: 0,
-  },
-  userName: {
-    fontSize: '1rem',
-    fontWeight: 600,
-    color: 'var(--color-text)',
-  },
-  badgesRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    marginTop: '6px',
-    flexWrap: 'wrap',
-  },
-  actions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    marginLeft: 'auto',
-  },
-  actionBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--color-muted)',
-    padding: '6px',
-    borderRadius: 'var(--radius-sm)',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  emailRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    paddingTop: '10px',
-    borderTop: '1px solid var(--color-border)',
-  },
-  emailText: {
-    fontSize: '0.82rem',
-    color: 'var(--color-muted)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  centerState: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '60px 24px',
-    textAlign: 'center',
-  },
-  dialog: {
-    width: '92vw',
-    maxWidth: '480px',
-    margin: 'auto',
-    background: 'none',
-    border: 'none',
-    padding: 0,
-  },
-  modalContent: {
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border-strong)',
-    borderRadius: 'var(--radius-lg)',
-    padding: '26px 24px',
-    boxShadow: '0 20px 48px rgba(0, 0, 0, 0.55)',
-  },
-  modalHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    marginBottom: '18px',
-  },
-  iconWrap: {
-    width: '36px',
-    height: '36px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'rgba(247, 148, 29, 0.14)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalTitle: {
-    flex: 1,
-    fontSize: '1.1rem',
-    fontWeight: 600,
-    color: 'var(--color-text)',
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--color-muted)',
-    padding: '4px',
-    display: 'flex',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '14px',
-  },
-  fieldGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  label: {
-    fontSize: '0.82rem',
-    fontWeight: 500,
-    color: 'var(--color-muted)',
-  },
-  row: {
-    display: 'flex',
-    gap: '12px',
-    flexWrap: 'wrap',
-  },
-  checkboxRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '0.84rem',
-    color: 'var(--color-text)',
-    cursor: 'pointer',
-  },
-  swatchRow: {
-    display: 'flex',
-    gap: '10px',
-    paddingTop: '4px',
-  },
-  swatchBtn: {
-    width: '32px',
-    height: '32px',
-    borderRadius: '50%',
-    border: 'none',
-    cursor: 'pointer',
-  },
-  modalFooter: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    marginTop: '10px',
-  },
 }

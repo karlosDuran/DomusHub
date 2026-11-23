@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Columns3,
   Plus,
@@ -8,13 +8,14 @@ import {
   Pencil,
   Trash2,
   Bell,
-  X,
 } from 'lucide-react'
 import { useKanban } from '../hooks/useKanban'
+import DialogShell from '../components/ui/DialogShell'
 import TareaModal from '../components/ui/TareaModal'
 import TareaDetallesModal from '../components/ui/TareaDetallesModal'
 import HistorialModal from '../components/ui/HistorialModal'
 import Modal from '../components/ui/Modal'
+import Spinner from '../components/ui/Spinner'
 import { toast } from 'react-hot-toast'
 import { useAuthStore } from '../stores/authStore'
 import api from '../api/axiosInstance'
@@ -26,9 +27,15 @@ const PRIORIDAD_META = {
   baja:    { label: 'Baja',    className: 'badge badge-neutral' },
 }
 
+const COL_DOTS = [
+  'var(--color-accent)',
+  'var(--color-info)',
+  'var(--color-warning)',
+  'var(--color-success)',
+]
+
 // ── Modal para crear nueva columna Kanban ─────────────────────────────────────
 function NuevaColumnaModal({ isOpen, onClose, onSave, totalColumnas }) {
-  const dialogRef = useRef(null)
   const [nombre, setNombre] = useState('')
   const [posicion, setPosicion] = useState(totalColumnas + 1)
   const [submitting, setSubmitting] = useState(false)
@@ -42,16 +49,6 @@ function NuevaColumnaModal({ isOpen, onClose, onSave, totalColumnas }) {
     }
     sync()
   }, [isOpen, totalColumnas])
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (isOpen) {
-      if (!dialog.open) dialog.showModal()
-    } else {
-      if (dialog.open) dialog.close()
-    }
-  }, [isOpen])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -72,78 +69,74 @@ function NuevaColumnaModal({ isOpen, onClose, onSave, totalColumnas }) {
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      onClick={(e) => e.target === dialogRef.current && onClose()}
+    <DialogShell
+      isOpen={isOpen}
       onClose={onClose}
-      style={styles.colDialog}
-    >
-      <div style={styles.colModalContent} className="animate-scale-in">
-        <div style={styles.colModalHeader}>
-          <h2 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Nueva Columna Kanban</h2>
-          <button type="button" onClick={onClose} style={styles.closeBtn} aria-label="Cerrar">
-            <X size={18} />
+      title="Nueva columna"
+      icon={<Columns3 size={18} />}
+      maxWidth="max-w-[420px]"
+      footer={
+        <>
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>
+            Cancelar
           </button>
+          <button
+            type="submit"
+            form="nueva-columna-form"
+            className="btn btn-primary"
+            disabled={submitting}
+          >
+            {submitting && <Spinner size="sm" color="currentColor" />}
+            Crear columna
+          </button>
+        </>
+      }
+    >
+      <form id="nueva-columna-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="col-nombre" className="text-xs font-medium text-[var(--color-muted)]">
+            Nombre de la columna *
+          </label>
+          <input
+            id="col-nombre"
+            type="text"
+            className="input"
+            placeholder="Ej. En revisión, Compras pendientes"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            required
+            disabled={submitting}
+          />
         </div>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <label htmlFor="col-nombre" style={styles.fieldLabel}>
-              Nombre de la columna *
-            </label>
-            <input
-              id="col-nombre"
-              type="text"
-              className="input"
-              placeholder="Ej. En revisión, Compras pendientes"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              required
-              disabled={submitting}
-            />
-          </div>
-          <div>
-            <label htmlFor="col-pos" style={styles.fieldLabel}>
-              Posición (orden)
-            </label>
-            <input
-              id="col-pos"
-              type="number"
-              min="1"
-              className="input font-mono-num"
-              value={posicion}
-              onChange={(e) => setPosicion(e.target.value)}
-              disabled={submitting}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
-            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>
-              Cancelar
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              Crear Columna
-            </button>
-          </div>
-        </form>
-      </div>
-    </dialog>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="col-pos" className="text-xs font-medium text-[var(--color-muted)]">
+            Posición (orden)
+          </label>
+          <input
+            id="col-pos"
+            type="number"
+            min="1"
+            inputMode="numeric"
+            className="input font-mono-num"
+            value={posicion}
+            onChange={(e) => setPosicion(e.target.value)}
+            disabled={submitting}
+          />
+        </div>
+      </form>
+    </DialogShell>
   )
 }
 
-// ── Skeleton de columna ───────────────────────────────────────────────────────
 function SkeletonColumn() {
   return (
-    <div style={styles.skeletonCol} className="kanban-column">
-      <div
-        className="skeleton"
-        style={{ height: '20px', width: '60%', borderRadius: '4px', marginBottom: '16px' }}
-      />
-      {[...Array(3)].map((_, i) => (
-        <div
-          key={i}
-          className="skeleton"
-          style={{ height: '76px', borderRadius: 'var(--radius-md)', marginBottom: '10px' }}
-        />
-      ))}
+    <div className="kanban-column rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-3.5">
+      <div className="skeleton mb-4 h-5 w-1/2 rounded" />
+      <div className="flex flex-col gap-2.5">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="skeleton h-20 rounded-xl" />
+        ))}
+      </div>
     </div>
   )
 }
@@ -169,33 +162,31 @@ function TareaCard({
   const dVenc = formatFechaVencimiento(tarea.fecha_vencimiento)
   const prio = PRIORIDAD_META[tarea.prioridad] || PRIORIDAD_META.media
   const esBasura = Number(tarea.es_turno_basura) === 1
+  const esUrgente = tarea.prioridad === 'urgente'
   const asignadoUser = usuariosMap.get(String(tarea.asignado_a_user_id))
 
   return (
     <article
-      className="card animate-fade-in-up"
-      style={{
-        ...styles.tareaCard,
-        cursor: 'grab',
-        borderLeft:
-          tarea.prioridad === 'urgente' || esBasura
-            ? '3px solid var(--color-danger)'
-            : '1px solid var(--color-border)',
-      }}
-      onClick={() => onVerDetalles(tarea)}
       draggable
       onDragStart={(e) => e.dataTransfer.setData('text/plain', String(tarea.id))}
+      onClick={() => onVerDetalles(tarea)}
+      className={[
+        'surface-card surface-card-interactive group cursor-grab p-3.5 active:cursor-grabbing',
+        esUrgente || esBasura ? 'border-[rgba(196,62,59,0.3)]' : '',
+      ].join(' ')}
     >
-      <div style={styles.tareaHeader}>
-        <p style={styles.tareaTitle}>{tarea.titulo}</p>
-        <div style={styles.actions} className="task-actions">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold leading-snug text-[var(--color-text)]">
+          {tarea.titulo}
+        </p>
+        <div className="flex shrink-0 items-center gap-0.5 md:opacity-0 md:transition-opacity md:duration-150 md:group-hover:opacity-100">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation()
               onVerHistorial(tarea)
             }}
-            style={styles.actionBtn}
+            className="btn-icon h-7 w-7"
             title="Ver historial de auditoría"
             aria-label="Ver historial"
           >
@@ -207,7 +198,7 @@ function TareaCard({
               e.stopPropagation()
               onEdit(tarea)
             }}
-            style={styles.actionBtn}
+            className="btn-icon h-7 w-7"
             title="Editar tarea"
             aria-label="Editar"
           >
@@ -219,8 +210,7 @@ function TareaCard({
               e.stopPropagation()
               onDelete(tarea)
             }}
-            className="action-btn-danger"
-            style={styles.actionBtn}
+            className="btn-icon btn-icon-danger h-7 w-7"
             title="Eliminar tarea"
             aria-label="Eliminar"
           >
@@ -229,65 +219,68 @@ function TareaCard({
         </div>
       </div>
 
-      {tarea.descripcion && <p style={styles.tareaDesc}>{tarea.descripcion}</p>}
+      {tarea.descripcion && (
+        <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-[var(--color-muted)]">
+          {tarea.descripcion}
+        </p>
+      )}
 
-      {/* Badges de Prioridad, Turno de Basura, Recurrencia y Vencimiento */}
-      <div style={styles.badgesWrap}>
-        <span className={prio.className} style={{ fontSize: '0.68rem', padding: '1px 7px' }}>
-          {prio.label}
-        </span>
+      {/* Badges */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <span className={`${prio.className} text-[11px]`}>{prio.label}</span>
 
         {esBasura && (
-          <span className="badge badge-warning" style={{ fontSize: '0.68rem', padding: '1px 7px' }}>
-            🗑️ Basura
+          <span className="badge badge-warning text-[11px]">
+            <Trash2 size={10} /> Basura
           </span>
         )}
 
         {Number(tarea.es_recurrente) === 1 && (
-          <span className="badge" style={styles.recurrenteBadge}>
+          <span className="badge badge-info text-[11px]">
             <RefreshCw size={10} /> Recurrente
           </span>
         )}
 
         {dVenc && (
           <span
-            className="badge font-mono-num"
-            style={styles.vencimientoBadge}
+            className="badge badge-neutral font-mono-num text-[11px]"
             title={`Vence el: ${tarea.fecha_vencimiento}`}
           >
-            Vence: {dVenc}
+            {dVenc}
           </span>
         )}
       </div>
 
-      <div style={styles.tareaFooter}>
+      {/* Pie: Responsable + Selector de columna */}
+      <div className="mt-3 flex items-center gap-2 border-t border-[var(--color-border)] pt-2.5">
         {tarea.asignado_nombre ? (
           <span
-            style={{
-              ...styles.asignadoChip,
-              background: asignadoUser?.avatar_color || 'var(--color-accent)',
-            }}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+            style={{ backgroundColor: asignadoUser?.avatar_color || 'var(--color-accent)' }}
             title={`Asignado a: ${tarea.asignado_nombre}`}
           >
             {tarea.asignado_nombre[0].toUpperCase()}
           </span>
         ) : (
-          <span style={styles.noAsignadoChip} title="Toda la familia">
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-subtle)] text-[11px] font-semibold text-[var(--color-muted)]"
+            title="Toda la familia"
+          >
             F
           </span>
         )}
-        <span style={styles.asignadoNombreText}>
+
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--color-muted)]">
           {tarea.asignado_nombre || 'Familia'}
         </span>
 
-        {/* Selector rápido de columna */}
         {columnas.length > 1 && (
           <select
             value={tarea.columna_id}
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => onMover(tarea.id, e.target.value)}
-            style={styles.colSelect}
             aria-label="Mover tarea a columna"
+            className="max-w-[112px] cursor-pointer rounded-md border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-2 py-1 text-[11px] font-medium text-[var(--color-text)] outline-none"
           >
             {columnas.map((c) => (
               <option key={c.id} value={c.id}>
@@ -315,47 +308,61 @@ function KanbanColumnComp({
   onVerHistorial,
   onVerDetalles,
 }) {
-  const colorBorder =
-    [
-      'var(--color-accent)',
-      'var(--color-info)',
-      'var(--color-success)',
-      'var(--color-warning)',
-    ][(Number(columna.posicion) - 1) % 4] ?? 'var(--color-accent)'
+  const [dragOver, setDragOver] = useState(false)
+  const dotColor = COL_DOTS[(Number(columna.posicion) - 1) % COL_DOTS.length] ?? COL_DOTS[0]
 
   const handleDragOver = (e) => {
     e.preventDefault()
+    if (!dragOver) setDragOver(true)
+  }
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOver(false)
+    }
   }
 
   const handleDrop = (e) => {
     e.preventDefault()
+    setDragOver(false)
     const tareaId = e.dataTransfer.getData('text/plain')
     if (tareaId) {
-      // Compatibilidad IDs string de DynamoDB (sin Number(tareaId))
       onMover(tareaId, columna.id)
     }
   }
 
   return (
     <section
-      className="kanban-column card m-nolift"
-      style={{ ...styles.column, borderTop: `3px solid ${colorBorder}` }}
       aria-label={`Columna: ${columna.nombre}`}
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      className={[
+        'kanban-column flex flex-col rounded-2xl border p-3.5 transition-[border-color,background-color] duration-150',
+        dragOver
+          ? 'border-dashed border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+          : 'border-[var(--color-border)] bg-[var(--color-surface-subtle)]',
+      ].join(' ')}
     >
-      <div style={styles.colHeader}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <h2 style={styles.colTitle}>{columna.nombre}</h2>
-          <span style={styles.colCount} className="font-mono-num">
+      <div className="mb-3 flex items-center justify-between gap-2 px-0.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: dotColor }}
+          />
+          <h2 className="truncate text-sm font-semibold text-[var(--color-text)]">
+            {columna.nombre}
+          </h2>
+          <span className="font-mono-num rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--color-muted)]">
             {tareas.length}
           </span>
         </div>
+
         {columnas.length > 1 && (
           <button
             type="button"
             onClick={() => onEliminarColumna(columna)}
-            style={styles.deleteColBtn}
+            className="btn-icon btn-icon-danger h-7 w-7"
             title={`Eliminar columna ${columna.nombre}`}
             aria-label={`Eliminar columna ${columna.nombre}`}
           >
@@ -364,8 +371,12 @@ function KanbanColumnComp({
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {tareas.length === 0 && <p style={styles.colEmpty}>Sin tareas en esta columna</p>}
+      <div className="flex flex-1 flex-col gap-2.5">
+        {tareas.length === 0 && (
+          <p className="rounded-xl border border-dashed border-[var(--color-border)] py-6 text-center text-xs text-[var(--color-muted)]">
+            Sin tareas aquí
+          </p>
+        )}
         {tareas.map((t) => (
           <TareaCard
             key={t.id}
@@ -383,17 +394,15 @@ function KanbanColumnComp({
 
       <button
         type="button"
-        className="btn btn-ghost"
-        style={styles.addTaskBtn}
         onClick={() => onAgregarTarea(columna.id)}
+        className="btn btn-subtle mt-3 min-h-[36px] w-full justify-center border border-dashed border-[var(--color-border-strong)] text-xs"
       >
-        <Plus size={15} /> Agregar tarea
+        <Plus size={14} /> Agregar tarea
       </button>
     </section>
   )
 }
 
-// ── Vista principal ───────────────────────────────────────────────────────────
 export default function KanbanView() {
   const userId = useAuthStore((s) => s.user?.id)
 
@@ -413,11 +422,10 @@ export default function KanbanView() {
     evaluarAvisos,
   } = useKanban()
 
-  const [filtro, setFiltro] = useState('todos') // 'todos' | 'mis' | 'basura' | 'user:<id>' | 'lun'..'dom'
+  const [filtro, setFiltro] = useState('todos')
   const [usuarios, setUsuarios] = useState([])
   const [enviandoAvisos, setEnviandoAvisos] = useState(false)
 
-  // Estados de Modales
   const [modalTarea, setModalTarea] = useState({ open: false, tarea: null, columnaId: null })
   const [modalDetalles, setModalDetalles] = useState({ open: false, tarea: null })
   const [modalHistorial, setModalHistorial] = useState({ open: false, tarea: null })
@@ -426,7 +434,6 @@ export default function KanbanView() {
   const [modalEliminarCol, setModalEliminarCol] = useState({ open: false, columna: null })
   const [loadingDelete, setLoadingDelete] = useState(false)
 
-  // Cargar lista de integrantes familiares para asignación y filtros
   useEffect(() => {
     const loadUsuarios = async () => {
       try {
@@ -439,7 +446,6 @@ export default function KanbanView() {
     loadUsuarios()
   }, [])
 
-  // Evaluar avisos SNS automáticamente 1 vez por sesión al abrir el tablero
   useEffect(() => {
     const KEY = 'homeops-avisos-evaluados'
     if (sessionStorage.getItem(KEY)) return
@@ -450,9 +456,7 @@ export default function KanbanView() {
           toast.success(res.message || `Se enviaron ${res.avisos_enviados} recordatorio(s) SNS.`)
         }
       })
-      .catch(() => {
-        // Silencioso en evaluación automática inicial
-      })
+      .catch(() => {})
   }, [evaluarAvisos])
 
   const handleEvaluarAvisosManual = async () => {
@@ -462,7 +466,7 @@ export default function KanbanView() {
       if (res?.avisos_enviados > 0) {
         toast.success(res.message)
       } else {
-        toast(res?.message || 'No hay avisos pendientes por enviar hoy.', { icon: '📬' })
+        toast(res?.message || 'No hay avisos pendientes por enviar hoy.')
       }
     } catch (err) {
       toast.error(err.response?.data?.error ?? 'No se pudieron evaluar los avisos SNS.')
@@ -474,7 +478,6 @@ export default function KanbanView() {
   const handleMover = async (tareaId, nuevaColumnaId) => {
     const tarea = tareas.find((t) => String(t.id) === String(tareaId))
     if (!tarea || String(tarea.columna_id) === String(nuevaColumnaId)) return
-
     try {
       await moverTarea(tareaId, nuevaColumnaId)
       toast.success('Tarea movida')
@@ -522,7 +525,7 @@ export default function KanbanView() {
     setLoadingDelete(true)
     try {
       await eliminarTarea(modalEliminar.tarea.id)
-      toast.success('Tarea eliminada correctamente')
+      toast.success('Tarea eliminada')
       setModalEliminar({ open: false, tarea: null })
     } catch {
       toast.error('Error al intentar eliminar la tarea.')
@@ -545,15 +548,7 @@ export default function KanbanView() {
     }
   }
 
-  const diasMapeo = {
-    lun: 1,
-    mar: 2,
-    mie: 3,
-    jue: 4,
-    vie: 5,
-    sab: 6,
-    dom: 0,
-  }
+  const diasMapeo = { lun: 1, mar: 2, mie: 3, jue: 4, vie: 5, sab: 6, dom: 0 }
 
   const getDiaSemana = (fechaStr) => {
     if (!fechaStr) return -1
@@ -567,37 +562,45 @@ export default function KanbanView() {
   const tareasFiltradas = tareas.filter((t) => {
     if (filtro === 'todos') return true
     if (filtro === 'basura') return Number(t.es_turno_basura) === 1
-
-    const esMia = String(t.asignado_a_user_id) === String(userId)
-    if (filtro === 'mis') return esMia
-
+    if (filtro === 'mis') return String(t.asignado_a_user_id) === String(userId)
     if (filtro.startsWith('user:')) {
-      const targetUserId = filtro.slice(5)
-      return String(t.asignado_a_user_id) === String(targetUserId)
+      return String(t.asignado_a_user_id) === String(filtro.slice(5))
     }
-
     const targetDay = diasMapeo[filtro]
     if (targetDay !== undefined) {
       return getDiaSemana(t.fecha_vencimiento) === targetDay
     }
-
     return true
   })
 
+  const filterItems = [
+    { key: 'todos', label: 'Ver todo' },
+    { key: 'mis', label: 'Mis tareas' },
+    { key: 'basura', label: 'Turnos basura', icon: Trash2 },
+    ...usuarios.map((u) => ({ key: `user:${u.id}`, label: u.nombre })),
+    { key: 'lun', label: 'Lun' },
+    { key: 'mar', label: 'Mar' },
+    { key: 'mie', label: 'Mié' },
+    { key: 'jue', label: 'Jue' },
+    { key: 'vie', label: 'Vie' },
+    { key: 'sab', label: 'Sáb' },
+    { key: 'dom', label: 'Dom' },
+  ]
+
   return (
-    <div id="kanban-page" style={styles.page}>
+    <div id="kanban-page" className="mx-auto max-w-[1200px]">
       {/* Header */}
-      <header style={styles.header}>
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 style={styles.pageTitle}>Tareas del Hogar</h1>
-          <p style={styles.pageSubtitle}>
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">Tareas del hogar</h1>
+          <p className="mt-0.5 text-sm text-[var(--color-muted)]">
             {loading
-              ? '…'
+              ? 'Cargando tablero…'
               : `${tareas.length} tarea${tareas.length !== 1 ? 's' : ''} en ${columnas.length} columna${columnas.length !== 1 ? 's' : ''}`}
           </p>
         </div>
 
-        <div style={styles.headerActions}>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             className="btn btn-ghost"
@@ -605,7 +608,7 @@ export default function KanbanView() {
             disabled={enviandoAvisos}
             title="Evaluar tareas que vencen hoy o turnos de basura y enviar recordatorio por Amazon SNS"
           >
-            <Bell size={16} />
+            <Bell size={15} />
             {enviandoAvisos ? 'Evaluando…' : 'Avisos del día'}
           </button>
 
@@ -614,7 +617,7 @@ export default function KanbanView() {
             className="btn btn-ghost"
             onClick={() => setModalColumna(true)}
           >
-            <Columns3 size={16} /> + Columna
+            <Columns3 size={15} /> Columna
           </button>
 
           <button
@@ -629,43 +632,38 @@ export default function KanbanView() {
               })
             }
           >
-            <Plus size={18} /> Nueva tarea
+            <Plus size={17} /> Nueva tarea
           </button>
         </div>
       </header>
 
-      {/* Filtros principales y por integrante familiar */}
-      <div style={styles.filtersBar} role="tablist" aria-label="Filtros de tareas">
-        {[
-          { key: 'todos',  label: 'Ver todo' },
-          { key: 'mis',    label: 'Mis tareas' },
-          { key: 'basura', label: '🗑️ Turnos basura' },
-          ...usuarios.map((u) => ({
-            key: `user:${u.id}`,
-            label: u.nombre,
-          })),
-          { key: 'lun', label: 'Lun' },
-          { key: 'mar', label: 'Mar' },
-          { key: 'mie', label: 'Mié' },
-          { key: 'jue', label: 'Jue' },
-          { key: 'vie', label: 'Vie' },
-          { key: 'sab', label: 'Sáb' },
-          { key: 'dom', label: 'Dom' },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={filtro === key}
-            onClick={() => setFiltro(key)}
-            style={{
-              ...styles.tab,
-              ...(filtro === key ? styles.tabActive : {}),
-            }}
-          >
-            {label}
-          </button>
-        ))}
+      {/* Filtros */}
+      <div
+        className="pill-bar mb-5 pb-1 md:flex-wrap md:overflow-visible"
+        role="tablist"
+        aria-label="Filtros de tareas"
+      >
+        {filterItems.map(({ key, label, icon: Icon }) => {
+          const active = filtro === key
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setFiltro(key)}
+              className={[
+                'inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-[background-color,border-color,color] duration-150 active:scale-[0.97]',
+                active
+                  ? 'border-[var(--color-accent)] bg-[var(--color-accent)] font-semibold text-[var(--color-accent-ink)]'
+                  : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-[var(--color-text)]',
+              ].join(' ')}
+            >
+              {Icon && <Icon size={12} />}
+              {label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Cargando */}
@@ -679,36 +677,32 @@ export default function KanbanView() {
 
       {/* Error */}
       {!loading && error && (
-        <div style={styles.centerState} className="animate-fade-in">
-          <AlertTriangle size={32} color="var(--color-danger)" />
-          <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>Error al cargar el tablero</p>
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>{error}</p>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={refetch}
-            style={{ marginTop: '8px' }}
-          >
-            <RefreshCw size={16} /> Reintentar
+        <div className="animate-fade-in flex flex-col items-center gap-2 py-14 text-center">
+          <AlertTriangle size={28} className="text-[var(--color-danger)]" />
+          <p className="font-semibold text-[var(--color-danger-text)]">
+            Error al cargar el tablero
+          </p>
+          <p className="text-sm text-[var(--color-muted)]">{error}</p>
+          <button type="button" className="btn btn-ghost mt-2" onClick={refetch}>
+            <RefreshCw size={15} /> Reintentar
           </button>
         </div>
       )}
 
       {/* Vacío */}
       {!loading && !error && columnas.length === 0 && (
-        <div style={styles.centerState} className="animate-fade-in">
-          <div style={styles.emptyIcon}>
-            <Columns3 size={36} color="var(--color-muted)" />
+        <div className="animate-fade-in flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] px-6 py-14 text-center">
+          <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-surface-subtle)] text-[var(--color-muted)]">
+            <Columns3 size={24} />
           </div>
-          <p style={{ color: 'var(--color-text)', fontWeight: 600 }}>No hay columnas todavía</p>
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+          <p className="font-semibold text-[var(--color-text)]">No hay columnas todavía</p>
+          <p className="max-w-sm text-sm text-[var(--color-muted)]">
             Crea la primera columna para comenzar a organizar las tareas del hogar.
           </p>
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-primary mt-3"
             onClick={() => setModalColumna(true)}
-            style={{ marginTop: '8px' }}
           >
             <Plus size={16} /> Crear primera columna
           </button>
@@ -739,7 +733,6 @@ export default function KanbanView() {
         </div>
       )}
 
-      {/* Modal para Crear/Editar Tarea */}
       <TareaModal
         isOpen={modalTarea.open}
         onClose={() => setModalTarea({ open: false, tarea: null, columnaId: null })}
@@ -751,7 +744,6 @@ export default function KanbanView() {
         currentUserId={userId}
       />
 
-      {/* Modal para Crear Columna */}
       <NuevaColumnaModal
         isOpen={modalColumna}
         onClose={() => setModalColumna(false)}
@@ -759,7 +751,6 @@ export default function KanbanView() {
         totalColumnas={columnas.length}
       />
 
-      {/* Modal de Historial de Auditoría */}
       <HistorialModal
         isOpen={modalHistorial.open}
         onClose={() => setModalHistorial({ open: false, tarea: null })}
@@ -767,31 +758,28 @@ export default function KanbanView() {
         fetchHistorial={fetchHistorial}
       />
 
-      {/* Modal de confirmación para eliminar tarea */}
       <Modal
         isOpen={modalEliminar.open}
         onClose={() => setModalEliminar({ open: false, tarea: null })}
         onConfirm={handleConfirmEliminar}
-        title="Eliminar Tarea"
-        message={`¿Estás seguro de que deseas eliminar la tarea "${modalEliminar.tarea?.titulo}"? Esta acción es definitiva.`}
+        title="Eliminar tarea"
+        message={`¿Seguro que deseas eliminar la tarea "${modalEliminar.tarea?.titulo}"? Esta acción es definitiva.`}
         confirmText="Eliminar"
         variant="danger"
         loading={loadingDelete}
       />
 
-      {/* Modal de confirmación para eliminar columna */}
       <Modal
         isOpen={modalEliminarCol.open}
         onClose={() => setModalEliminarCol({ open: false, columna: null })}
         onConfirm={handleConfirmEliminarColumna}
-        title="Eliminar Columna"
+        title="Eliminar columna"
         message={`¿Deseas eliminar la columna "${modalEliminarCol.columna?.nombre}" y todas las tareas que contiene?`}
-        confirmText="Eliminar Columna"
+        confirmText="Eliminar columna"
         variant="danger"
         loading={loadingDelete}
       />
 
-      {/* Modal de Detalles de Tarea */}
       <TareaDetallesModal
         isOpen={modalDetalles.open}
         onClose={() => setModalDetalles({ open: false, tarea: null })}
@@ -802,284 +790,4 @@ export default function KanbanView() {
       />
     </div>
   )
-}
-
-const styles = {
-  page: { height: '100%' },
-  header: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: '16px',
-    marginBottom: '18px',
-    flexWrap: 'wrap',
-  },
-  headerActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    flexWrap: 'wrap',
-  },
-  pageTitle: {
-    fontSize: '1.6rem',
-    fontWeight: 700,
-    color: 'var(--color-text)',
-  },
-  pageSubtitle: { color: 'var(--color-muted)', fontSize: '0.875rem', marginTop: '2px' },
-  filtersBar: {
-    display: 'flex',
-    gap: '6px',
-    overflowX: 'auto',
-    paddingBottom: '12px',
-    marginBottom: '14px',
-  },
-  tab: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '6px 14px',
-    borderRadius: '999px',
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-surface)',
-    color: 'var(--color-muted)',
-    fontSize: '0.82rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    transition: 'all 150ms var(--ease)',
-  },
-  tabActive: {
-    background: 'rgba(247, 148, 29, 0.14)',
-    borderColor: 'rgba(247, 148, 29, 0.45)',
-    color: 'var(--color-accent)',
-    fontWeight: 600,
-  },
-  skeletonCol: {
-    minWidth: '296px',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-md)',
-    padding: '16px',
-  },
-  column: {
-    padding: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignSelf: 'flex-start',
-  },
-  colHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: '14px',
-  },
-  colTitle: { fontSize: '0.94rem', fontWeight: 600, color: 'var(--color-text)' },
-  colCount: {
-    background: 'var(--color-surface2)',
-    border: '1px solid var(--color-border)',
-    borderRadius: '999px',
-    padding: '1px 8px',
-    fontSize: '0.74rem',
-    color: 'var(--color-muted)',
-    fontWeight: 600,
-  },
-  deleteColBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'var(--color-muted)',
-    cursor: 'pointer',
-    padding: '4px',
-    borderRadius: 'var(--radius-sm)',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  colEmpty: {
-    textAlign: 'center',
-    color: 'var(--color-muted)',
-    fontSize: '0.82rem',
-    padding: '22px 0',
-  },
-  tareaCard: {
-    padding: '13px 14px',
-    borderRadius: 'var(--radius-md)',
-    background: 'var(--color-surface2)',
-  },
-  tareaHeader: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: '8px',
-  },
-  tareaTitle: {
-    fontSize: '0.9rem',
-    fontWeight: 600,
-    color: 'var(--color-text)',
-    marginBottom: '4px',
-    lineHeight: 1.38,
-    flex: 1,
-  },
-  tareaDesc: {
-    fontSize: '0.8rem',
-    color: 'var(--color-muted)',
-    marginBottom: '8px',
-    lineHeight: 1.45,
-  },
-  badgesWrap: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-    flexWrap: 'wrap',
-    marginBottom: '10px',
-  },
-  tareaFooter: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    flexWrap: 'wrap',
-    paddingTop: '8px',
-    borderTop: '1px solid var(--color-border)',
-  },
-  asignadoChip: {
-    width: '22px',
-    height: '22px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '0.7rem',
-    fontWeight: 700,
-    color: '#fff',
-    flexShrink: 0,
-  },
-  noAsignadoChip: {
-    width: '22px',
-    height: '22px',
-    borderRadius: '50%',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '0.68rem',
-    color: 'var(--color-muted)',
-    flexShrink: 0,
-  },
-  asignadoNombreText: {
-    fontSize: '0.76rem',
-    color: 'var(--color-muted)',
-    fontWeight: 500,
-    maxWidth: '90px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  recurrenteBadge: {
-    background: 'rgba(56, 189, 248, 0.14)',
-    color: '#38bdf8',
-    border: '1px solid rgba(56, 189, 248, 0.3)',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '3px',
-    fontSize: '0.68rem',
-    padding: '1px 7px',
-    borderRadius: '999px',
-  },
-  vencimientoBadge: {
-    background: 'rgba(239, 68, 68, 0.14)',
-    color: '#f87171',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '3px',
-    fontSize: '0.68rem',
-    padding: '1px 7px',
-    borderRadius: '999px',
-  },
-  colSelect: {
-    marginLeft: 'auto',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--color-text)',
-    fontSize: '0.74rem',
-    padding: '2px 6px',
-    cursor: 'pointer',
-  },
-  addTaskBtn: {
-    width: '100%',
-    justifyContent: 'center',
-    marginTop: '12px',
-    fontSize: '0.82rem',
-    minHeight: '38px',
-    padding: '6px 12px',
-  },
-  centerState: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '60px 24px',
-    textAlign: 'center',
-  },
-  emptyIcon: {
-    width: '72px',
-    height: '72px',
-    borderRadius: 'var(--radius-lg)',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '8px',
-  },
-  actions: {
-    display: 'flex',
-    gap: '2px',
-    flexShrink: 0,
-  },
-  actionBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--color-muted)',
-    padding: '4px',
-    borderRadius: 'var(--radius-sm)',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  colDialog: {
-    width: '90vw',
-    maxWidth: '400px',
-    margin: 'auto',
-    background: 'none',
-    border: 'none',
-    padding: 0,
-  },
-  colModalContent: {
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border-strong)',
-    borderRadius: 'var(--radius-lg)',
-    padding: '24px',
-    boxShadow: '0 20px 48px rgba(0, 0, 0, 0.55)',
-  },
-  colModalHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: '16px',
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'var(--color-muted)',
-    cursor: 'pointer',
-    padding: '4px',
-    display: 'flex',
-  },
-  fieldLabel: {
-    display: 'block',
-    fontSize: '0.82rem',
-    color: 'var(--color-muted)',
-    marginBottom: '6px',
-  },
 }

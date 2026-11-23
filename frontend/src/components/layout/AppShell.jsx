@@ -1,19 +1,21 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Home, LogOut } from 'lucide-react'
+import { Home, LogOut, Sun, Moon } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import SideNav from './SideNav'
 import BottomNav from './BottomNav'
 import { useAuthStore } from '../../stores/authStore'
 import { useInventarioStore } from '../../stores/inventarioStore'
+import { useThemeStore } from '../../stores/themeStore'
 
 /**
  * AppShell — Layout principal de la aplicación autenticada.
- * Incluye SideNav fijo en desktop (≥768px) y barra superior + BottomNav en móvil (<768px).
  */
 export default function AppShell() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const resetInventario = useInventarioStore((s) => s.reset)
+  const theme = useThemeStore((s) => s.theme)
+  const toggleTheme = useThemeStore((s) => s.toggleTheme)
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -24,50 +26,75 @@ export default function AppShell() {
   }
 
   return (
-    <div className="app-layout">
+    <div className="flex min-h-dvh flex-col md:flex-row">
       {/* Desktop: sidebar fija */}
       <SideNav />
 
-      {/* Móvil: barra superior con perfil activo y botón de cerrar sesión */}
-      <header id="mobile-topbar" style={styles.mobileHeader}>
-        <Link to="/inventario" style={styles.brandLink}>
-          <span style={styles.logoIcon}>
-            <Home size={18} color="var(--color-accent)" />
+      {/* Móvil: barra superior translúcida con safe-area */}
+      <header
+        id="mobile-topbar"
+        className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--color-border)] px-4 backdrop-blur-md md:hidden"
+        style={{
+          minHeight: 'var(--mobile-topbar-height)',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          backgroundColor: 'var(--header-glass)',
+        }}
+      >
+        <Link to="/inventario" className="flex items-center gap-2.5 no-underline">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-accent)] text-[var(--color-accent-ink)]">
+            <Home size={16} strokeWidth={2.1} />
           </span>
-          <span style={styles.brandName}>HomeOps</span>
+          <span className="text-[0.98rem] font-bold tracking-[-0.02em] text-[var(--color-text)]">
+            HomeOps
+          </span>
         </Link>
 
-        <div style={styles.userArea}>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="btn-icon"
+            aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          >
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+
           <Link
             to="/perfiles"
-            style={styles.profilePill}
             title="Gestionar perfiles familiares"
+            className="flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] py-1 pr-2.5 pl-1 text-[var(--color-text)] no-underline"
           >
             <span
-              style={{
-                ...styles.avatar,
-                background: user?.avatar_color || 'var(--color-accent)',
-              }}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+              style={{ backgroundColor: user?.avatar_color || 'var(--color-accent)' }}
             >
               {user?.nombre?.[0]?.toUpperCase() ?? 'U'}
             </span>
-            <span style={styles.userName}>{user?.nombre ?? 'Usuario'}</span>
+            <span className="max-w-[96px] truncate text-xs font-semibold">
+              {user?.nombre ?? 'Usuario'}
+            </span>
           </Link>
 
           <button
             type="button"
             onClick={handleLogout}
-            style={styles.logoutBtn}
+            className="btn-icon btn-icon-danger"
             aria-label="Cerrar sesión"
             title="Cerrar sesión"
           >
-            <LogOut size={18} />
+            <LogOut size={17} />
           </button>
         </div>
       </header>
 
       {/* Contenido principal */}
-      <main className="main-content">
+      <main
+        className="w-full flex-1 px-4 py-6 sm:px-6 md:ml-[var(--sidenav-width)] md:px-9 md:py-8"
+        style={{
+          paddingBottom: 'calc(var(--nav-height) + 28px + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
         <Outlet />
       </main>
 
@@ -75,88 +102,4 @@ export default function AppShell() {
       <BottomNav />
     </div>
   )
-}
-
-const styles = {
-  mobileHeader: {
-    height: 'var(--mobile-topbar-height)',
-    padding: '0 16px',
-    background: 'var(--color-surface)',
-    borderBottom: '1px solid var(--color-border)',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'sticky',
-    top: 0,
-    zIndex: 95,
-  },
-  brandLink: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    textDecoration: 'none',
-  },
-  logoIcon: {
-    width: '32px',
-    height: '32px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'rgba(247, 148, 29, 0.14)',
-    border: '1px solid rgba(247, 148, 29, 0.3)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandName: {
-    fontWeight: 700,
-    fontSize: '1rem',
-    color: 'var(--color-text)',
-    letterSpacing: '-0.02em',
-  },
-  userArea: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  profilePill: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '4px 10px 4px 4px',
-    borderRadius: '999px',
-    background: 'var(--color-surface2)',
-    border: '1px solid var(--color-border)',
-    textDecoration: 'none',
-    color: 'var(--color-text)',
-  },
-  avatar: {
-    width: '26px',
-    height: '26px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '0.78rem',
-    fontWeight: 700,
-    color: '#fff',
-    flexShrink: 0,
-  },
-  userName: {
-    fontSize: '0.82rem',
-    fontWeight: 600,
-    maxWidth: '110px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  logoutBtn: {
-    width: '38px',
-    height: '38px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'transparent',
-    border: '1px solid var(--color-border)',
-    color: 'var(--color-muted)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-  },
 }

@@ -1,23 +1,38 @@
 <!doctype html>
-<html lang="es" data-type="software" data-radius="soft" data-buttons="solid" data-motion>
+<html lang="es" data-theme="light">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="page-type" content="software" />
-    <meta name="site-kind" content="software" />
-    <meta name="theme-color" content="#090b10" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#F8F7F4" />
+    <meta name="color-scheme" content="light dark" />
     <meta
       name="description"
-      content="HomeOps — Sistema de gestión doméstica, despensa inteligente con alertas SNS, modo supermercado y tablero Kanban familiar."
+      content="HomeOps — Gestión doméstica minimalista: despensa inteligente, modo supermercado y tareas familiares."
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400..600&family=Reddit+Sans:wght@400..700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <title>HomeOps — Gestión Doméstica</title>
+    <title>HomeOps — Gestión del Hogar</title>
+    <script>
+      ;(function () {
+        try {
+          var t = localStorage.getItem('homeops-theme')
+          if (t === 'dark' || t === 'light') {
+            document.documentElement.setAttribute('data-theme', t)
+            document.documentElement.style.colorScheme = t
+            var m = document.querySelector('meta[name="theme-color"]')
+            if (m) m.setAttribute('content', t === 'dark' ? '#131614' : '#F8F7F4')
+          }
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

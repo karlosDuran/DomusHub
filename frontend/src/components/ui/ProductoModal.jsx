@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { X, Package, DollarSign } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Package, DollarSign } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { CATEGORIAS_INVENTARIO } from '../../stores/inventarioStore'
+import DialogShell from './DialogShell'
 import Spinner from './Spinner'
 
 const UNIDADES_MEDIDA = [
@@ -18,10 +19,9 @@ const UNIDADES_MEDIDA = [
 ]
 
 /**
- * ProductoModal — Modal para Crear y Editar productos del inventario (con Categoría HomeOps).
+ * ProductoModal — Modal para Crear y Editar productos del inventario.
  */
 export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
-  const dialogRef = useRef(null)
   const isEdit = !!producto
 
   const [form, setForm] = useState({
@@ -36,46 +36,31 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
 
   useEffect(() => {
     const sync = async () => {
-      if (isOpen) {
-        if (producto) {
-          setForm({
-            nombre: producto.nombre ?? '',
-            categoria: CATEGORIAS_INVENTARIO.includes(producto.categoria)
-              ? producto.categoria
-              : 'Despensa',
-            cantidad_actual: producto.cantidad_actual ?? 0,
-            unidad_medida: producto.unidad_medida ?? 'unidad',
-            cantidad_minima: producto.cantidad_minima ?? 1,
-            precio_promedio: producto.precio_promedio ?? 0,
-          })
-        } else {
-          setForm({
-            nombre: '',
-            categoria: 'Despensa',
-            cantidad_actual: 0,
-            unidad_medida: 'unidad',
-            cantidad_minima: 1,
-            precio_promedio: 0,
-          })
-        }
+      if (!isOpen) return
+      if (producto) {
+        setForm({
+          nombre: producto.nombre ?? '',
+          categoria: CATEGORIAS_INVENTARIO.includes(producto.categoria)
+            ? producto.categoria
+            : 'Despensa',
+          cantidad_actual: producto.cantidad_actual ?? 0,
+          unidad_medida: producto.unidad_medida ?? 'unidad',
+          cantidad_minima: producto.cantidad_minima ?? 1,
+          precio_promedio: producto.precio_promedio ?? 0,
+        })
+      } else {
+        setForm({
+          nombre: '',
+          categoria: 'Despensa',
+          cantidad_actual: 0,
+          unidad_medida: 'unidad',
+          cantidad_minima: 1,
+          precio_promedio: 0,
+        })
       }
     }
     sync()
   }, [isOpen, producto])
-
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (isOpen) {
-      if (!dialog.open) dialog.showModal()
-    } else {
-      if (dialog.open) dialog.close()
-    }
-  }, [isOpen])
-
-  const handleBackdropClick = (e) => {
-    if (e.target === dialogRef.current) onClose()
-  }
 
   const handleChange = (e) => {
     const { name, value, type } = e.target
@@ -118,259 +103,157 @@ export default function ProductoModal({ isOpen, onClose, onSave, producto }) {
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      onClick={handleBackdropClick}
+    <DialogShell
+      isOpen={isOpen}
       onClose={onClose}
-      style={styles.dialog}
-    >
-      <div style={styles.content} className="animate-scale-in">
-        {/* Header */}
-        <div style={styles.header}>
-          <div style={styles.iconWrap}>
-            <Package size={20} color="var(--color-accent)" />
-          </div>
-          <h2 style={styles.title}>
-            {isEdit ? 'Editar Producto' : 'Nuevo Producto'}
-          </h2>
-          <button type="button" onClick={onClose} style={styles.closeBtn} aria-label="Cerrar">
-            <X size={18} />
+      title={isEdit ? 'Editar producto' : 'Nuevo producto'}
+      subtitle="Define el umbral mínimo para activar alertas automáticas"
+      icon={<Package size={18} />}
+      maxWidth="max-w-[480px]"
+      footer={
+        <>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            Cancelar
           </button>
+          <button
+            type="submit"
+            form="producto-form"
+            className="btn btn-primary"
+            disabled={submitting}
+          >
+            {submitting && <Spinner size="sm" color="currentColor" />}
+            {isEdit ? 'Guardar cambios' : 'Crear producto'}
+          </button>
+        </>
+      }
+    >
+      <form id="producto-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="prod-nombre" className="text-xs font-medium text-[var(--color-muted)]">
+            Nombre del producto *
+          </label>
+          <input
+            id="prod-nombre"
+            name="nombre"
+            type="text"
+            className="input"
+            placeholder="Ej. Leche entera, Papel higiénico, Arroz"
+            value={form.nombre}
+            onChange={handleChange}
+            required
+            disabled={submitting}
+            autoComplete="off"
+          />
         </div>
 
-        {/* Formulario */}
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Nombre */}
-          <div style={styles.fieldGroup}>
-            <label htmlFor="prod-nombre" style={styles.label}>
-              Nombre del Producto *
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="prod-categoria" className="text-xs font-medium text-[var(--color-muted)]">
+            Categoría
+          </label>
+          <select
+            id="prod-categoria"
+            name="categoria"
+            className="input"
+            value={form.categoria}
+            onChange={handleChange}
+            disabled={submitting}
+          >
+            {CATEGORIAS_INVENTARIO.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="prod-cant-actual" className="text-xs font-medium text-[var(--color-muted)]">
+              Cantidad actual
             </label>
             <input
-              id="prod-nombre"
-              name="nombre"
-              type="text"
-              className="input"
-              placeholder="Ej. Leche Entera, Papel Higiénico, Arroz"
-              value={form.nombre}
+              id="prod-cant-actual"
+              name="cantidad_actual"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              className="input font-mono-num"
+              value={form.cantidad_actual}
               onChange={handleChange}
-              required
               disabled={submitting}
-              autoComplete="off"
             />
           </div>
 
-          {/* Categoría */}
-          <div style={styles.fieldGroup}>
-            <label htmlFor="prod-categoria" style={styles.label}>
-              Categoría
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="prod-unidad" className="text-xs font-medium text-[var(--color-muted)]">
+              Unidad
             </label>
             <select
-              id="prod-categoria"
-              name="categoria"
+              id="prod-unidad"
+              name="unidad_medida"
               className="input"
-              value={form.categoria}
+              value={form.unidad_medida}
               onChange={handleChange}
               disabled={submitting}
-              style={{ appearance: 'auto' }}
             >
-              {CATEGORIAS_INVENTARIO.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+              {UNIDADES_MEDIDA.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
                 </option>
               ))}
             </select>
           </div>
+        </div>
 
-          <div style={styles.row}>
-            {/* Cantidad Actual */}
-            <div style={{ ...styles.fieldGroup, flex: 1 }}>
-              <label htmlFor="prod-cant-actual" style={styles.label}>
-                Cantidad Actual
-              </label>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="prod-cant-minima" className="text-xs font-medium text-[var(--color-muted)]">
+              Umbral mínimo (SNS)
+            </label>
+            <input
+              id="prod-cant-minima"
+              name="cantidad_minima"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              className="input font-mono-num"
+              value={form.cantidad_minima}
+              onChange={handleChange}
+              disabled={submitting}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="prod-precio" className="text-xs font-medium text-[var(--color-muted)]">
+              Precio referencia
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]">
+                <DollarSign size={15} />
+              </span>
               <input
-                id="prod-cant-actual"
-                name="cantidad_actual"
+                id="prod-precio"
+                name="precio_promedio"
                 type="number"
-                step="any"
+                inputMode="decimal"
+                step="0.01"
                 min="0"
-                className="input font-mono-num"
-                value={form.cantidad_actual}
+                className="input font-mono-num pl-8"
+                value={form.precio_promedio}
                 onChange={handleChange}
                 disabled={submitting}
               />
             </div>
-
-            {/* Unidad Medida */}
-            <div style={{ ...styles.fieldGroup, flex: 1 }}>
-              <label htmlFor="prod-unidad" style={styles.label}>
-                Unidad
-              </label>
-              <select
-                id="prod-unidad"
-                name="unidad_medida"
-                className="input"
-                value={form.unidad_medida}
-                onChange={handleChange}
-                disabled={submitting}
-                style={{ appearance: 'auto' }}
-              >
-                {UNIDADES_MEDIDA.map(({ value, label }) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
-
-          <div style={styles.row}>
-            {/* Cantidad Mínima */}
-            <div style={{ ...styles.fieldGroup, flex: 1 }}>
-              <label htmlFor="prod-cant-minima" style={styles.label}>
-                Umbral Mínimo (Alerta SNS)
-              </label>
-              <input
-                id="prod-cant-minima"
-                name="cantidad_minima"
-                type="number"
-                step="any"
-                min="0"
-                className="input font-mono-num"
-                value={form.cantidad_minima}
-                onChange={handleChange}
-                disabled={submitting}
-              />
-            </div>
-
-            {/* Precio Promedio / Referencia */}
-            <div style={{ ...styles.fieldGroup, flex: 1 }}>
-              <label htmlFor="prod-precio" style={styles.label}>
-                Precio Referencia ($)
-              </label>
-              <div style={{ position: 'relative' }}>
-                <span style={styles.currencyIcon}>
-                  <DollarSign size={16} color="var(--color-muted)" />
-                </span>
-                <input
-                  id="prod-precio"
-                  name="precio_promedio"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="input font-mono-num"
-                  value={form.precio_promedio}
-                  onChange={handleChange}
-                  disabled={submitting}
-                  style={{ paddingLeft: '32px' }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Footer del Form */}
-          <div style={styles.footer}>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={onClose}
-              disabled={submitting}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting}
-            >
-              {submitting && <Spinner size="sm" color="currentColor" />}
-              {isEdit ? 'Guardar Cambios' : 'Crear Producto'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </dialog>
+        </div>
+      </form>
+    </DialogShell>
   )
-}
-
-const styles = {
-  dialog: {
-    width: '90vw',
-    maxWidth: '480px',
-    margin: 'auto',
-    background: 'none',
-    border: 'none',
-    padding: 0,
-  },
-  content: {
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border-strong)',
-    borderRadius: 'var(--radius-lg)',
-    padding: '28px 24px',
-    boxShadow: '0 20px 48px rgba(0, 0, 0, 0.55)',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    marginBottom: '20px',
-  },
-  iconWrap: {
-    width: '36px',
-    height: '36px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'rgba(247, 148, 29, 0.14)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  title: {
-    flex: 1,
-    fontSize: '1.1rem',
-    fontWeight: 600,
-    color: 'var(--color-text)',
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--color-muted)',
-    padding: '4px',
-    display: 'flex',
-    borderRadius: 'var(--radius-sm)',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-  },
-  fieldGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  label: {
-    fontSize: '0.82rem',
-    fontWeight: 500,
-    color: 'var(--color-muted)',
-  },
-  row: {
-    display: 'flex',
-    gap: '12px',
-  },
-  currencyIcon: {
-    position: 'absolute',
-    left: '10px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    display: 'flex',
-    alignItems: 'center',
-    pointerEvents: 'none',
-  },
-  footer: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    marginTop: '12px',
-  },
 }

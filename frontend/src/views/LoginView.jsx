@@ -1,30 +1,42 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
-import { LogIn, Home, Eye, EyeOff, KeyRound, UserCheck, RefreshCw, ArrowLeft } from 'lucide-react'
+import {
+  LogIn,
+  Home,
+  Eye,
+  EyeOff,
+  KeyRound,
+  UserCheck,
+  RefreshCw,
+  ArrowLeft,
+  Sun,
+  Moon,
+} from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import api from '../api/axiosInstance'
 import { useAuthStore } from '../stores/authStore'
+import { useThemeStore } from '../stores/themeStore'
 import Spinner from '../components/ui/Spinner'
 
 export default function LoginView() {
   const navigate = useNavigate()
   const token = useAuthStore((s) => s.token)
   const login = useAuthStore((s) => s.login)
+  const theme = useThemeStore((s) => s.theme)
+  const toggleTheme = useThemeStore((s) => s.toggleTheme)
 
-  // Modo de acceso: 'pin' (Acceso rápido familiar) | 'password' (Usuario y contraseña)
   const [modo, setModo] = useState('pin')
-
-  // Estado para Acceso Rápido con PIN
   const [perfiles, setPerfiles] = useState([])
   const [loadingPerfiles, setLoadingPerfiles] = useState(true)
   const [perfilSeleccionado, setPerfilSeleccionado] = useState(null)
   const [pin, setPin] = useState('')
+  const [shakeKey, setShakeKey] = useState(0)
 
-  // Estado para Usuario y Contraseña
   const [form, setForm] = useState({ nombre: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [showPass, setShowPass] = useState(false)
+  const pinInputRef = useRef(null)
 
   const cargarPerfiles = async () => {
     setLoadingPerfiles(true)
@@ -36,7 +48,6 @@ export default function LoginView() {
         setModo('password')
       }
     } catch {
-      // Si el backend aún no está disponible o falla la carga inicial, mostramos login clásico
       setPerfiles([])
     } finally {
       setLoadingPerfiles(false)
@@ -52,7 +63,6 @@ export default function LoginView() {
     load()
   }, [token])
 
-  // Si ya hay sesión activa, redirigir al inventario
   if (token) {
     return <Navigate to="/inventario" replace />
   }
@@ -63,7 +73,7 @@ export default function LoginView() {
     if (!perfil.tiene_pin) {
       setForm((prev) => ({ ...prev, nombre: perfil.nombre }))
       setModo('password')
-      toast('Este perfil no tiene PIN activo. Ingresa con tu contraseña.', { icon: '🔑' })
+      toast('Este perfil no tiene PIN activo. Ingresa con tu contraseña.')
       return
     }
     setPerfilSeleccionado(perfil)
@@ -80,6 +90,7 @@ export default function LoginView() {
     if (!perfilSeleccionado) return
     if (pin.length !== 4) {
       setError('Ingresa los 4 dígitos de tu PIN.')
+      setShakeKey((k) => k + 1)
       return
     }
     setLoading(true)
@@ -96,6 +107,8 @@ export default function LoginView() {
       const msg = err.response?.data?.error ?? 'No se pudo verificar el PIN.'
       setError(msg)
       setPin('')
+      setShakeKey((k) => k + 1)
+      pinInputRef.current?.focus()
     } finally {
       setLoading(false)
     }
@@ -131,21 +144,54 @@ export default function LoginView() {
   }
 
   return (
-    <div id="login-page" style={styles.page}>
-      <main style={styles.cardWrapper} className="card m-nolift animate-scale-in">
+    <div
+      id="login-page"
+      className="relative flex min-h-dvh items-center justify-center bg-[var(--color-bg)] px-4 py-8"
+      style={{
+        paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
+        paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
+      }}
+    >
+      {/* Toggle de tema discreto */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="btn-icon fixed right-4 top-4 border border-[var(--color-border)] bg-[var(--color-surface)]"
+        style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+        aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      >
+        {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+      </button>
+
+      <main className="animate-enter w-full max-w-[440px] rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-8">
         {/* Cabecera de marca */}
-        <div style={styles.logoArea}>
-          <div style={styles.logoIcon}>
-            <Home size={26} color="var(--color-accent)" strokeWidth={1.9} />
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-3.5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-accent)] text-[var(--color-accent-ink)]">
+            <Home size={22} strokeWidth={2.1} />
           </div>
-          <h1 style={styles.title}>HomeOps</h1>
-          <p style={styles.subtitle}>
-            Gestión doméstica, despensa inteligente y tareas familiares
+          <h1 className="text-2xl font-bold tracking-[-0.03em] text-[var(--color-text)]">
+            HomeOps
+          </h1>
+          <p className="mt-1.5 text-sm text-[var(--color-muted)]">
+            Despensa inteligente, compras y tareas del hogar
           </p>
         </div>
 
-        {/* Selector de pestañas: Acceso Rápido (PIN) vs Contraseña */}
-        <div style={styles.modeTabs} role="tablist" aria-label="Método de acceso">
+        {/* Selector segmentado con indicador deslizante */}
+        <div
+          role="tablist"
+          aria-label="Método de acceso"
+          className="relative mb-6 grid grid-cols-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-1"
+        >
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] transition-transform duration-200"
+            style={{
+              transitionTimingFunction: 'var(--ease-in-out)',
+              transform: modo === 'password' ? 'translateX(100%)' : 'translateX(0)',
+            }}
+          />
           <button
             type="button"
             role="tab"
@@ -154,13 +200,13 @@ export default function LoginView() {
               setModo('pin')
               setError(null)
             }}
-            style={{
-              ...styles.modeTab,
-              ...(modo === 'pin' ? styles.modeTabActive : {}),
-            }}
+            className={[
+              'relative z-10 flex min-h-[38px] cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-xs sm:text-sm font-semibold transition-colors duration-150',
+              modo === 'pin' ? 'text-[var(--color-text)]' : 'text-[var(--color-muted)]',
+            ].join(' ')}
           >
-            <UserCheck size={16} />
-            Acceso Rápido (PIN)
+            <UserCheck size={15} />
+            Acceso PIN
           </button>
           <button
             type="button"
@@ -171,36 +217,32 @@ export default function LoginView() {
               setPerfilSeleccionado(null)
               setError(null)
             }}
-            style={{
-              ...styles.modeTab,
-              ...(modo === 'password' ? styles.modeTabActive : {}),
-            }}
+            className={[
+              'relative z-10 flex min-h-[38px] cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-xs sm:text-sm font-semibold transition-colors duration-150',
+              modo === 'password' ? 'text-[var(--color-text)]' : 'text-[var(--color-muted)]',
+            ].join(' ')}
           >
-            <KeyRound size={16} />
+            <KeyRound size={15} />
             Contraseña
           </button>
         </div>
 
-        {/* PESTAÑA 1: ACCESO RÁPIDO POR PERFIL + PIN */}
+        {/* PESTAÑA 1: ACCESO RÁPIDO CON PIN */}
         {modo === 'pin' && (
           <section aria-label="Acceso rápido con PIN">
             {loadingPerfiles ? (
-              <div style={styles.perfilesGrid}>
+              <div className="grid grid-cols-3 gap-2.5">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="skeleton" style={{ height: '84px' }} />
+                  <div key={i} className="skeleton h-24 rounded-xl" />
                 ))}
               </div>
             ) : perfiles.length === 0 ? (
-              <div style={styles.emptyPerfiles}>
-                <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem' }}>
+              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] p-5 text-center">
+                <p className="text-sm text-[var(--color-muted)]">
                   No se encontraron perfiles cargados o el servidor está sin conexión.
                 </p>
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '12px' }}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={cargarPerfiles}
-                  >
+                <div className="mt-4 flex justify-center gap-2">
+                  <button type="button" className="btn btn-ghost" onClick={cargarPerfiles}>
                     <RefreshCw size={15} /> Reintentar
                   </button>
                   <button
@@ -214,52 +256,58 @@ export default function LoginView() {
               </div>
             ) : !perfilSeleccionado ? (
               <>
-                <p style={styles.helperText}>
-                  Selecciona tu perfil familiar para ingresar con tu PIN de 4 dígitos:
+                <p className="mb-3.5 text-sm text-[var(--color-muted)]">
+                  Selecciona tu perfil familiar para ingresar:
                 </p>
-                <div style={styles.perfilesGrid}>
+                <div
+                  className="grid gap-2.5"
+                  style={{
+                    gridTemplateColumns:
+                      perfiles.length === 2 || perfiles.length === 4
+                        ? 'repeat(2, 1fr)'
+                        : 'repeat(auto-fit, minmax(112px, 1fr))',
+                  }}
+                >
                   {perfiles.map((p) => (
                     <button
                       key={p.id}
                       type="button"
                       onClick={() => handleSelectPerfil(p)}
-                      style={styles.perfilCard}
+                      className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3 py-4 text-center transition-[transform,border-color,background-color] duration-150 active:scale-[0.97] hover:border-[var(--color-accent-border)] hover:bg-[var(--color-surface)]"
                     >
                       <span
-                        style={{
-                          ...styles.perfilAvatar,
-                          background: p.avatar_color || 'var(--color-accent)',
-                        }}
+                        className="flex h-11 w-11 items-center justify-center rounded-full text-base font-bold text-white"
+                        style={{ backgroundColor: p.avatar_color || 'var(--color-accent)' }}
                       >
                         {p.nombre?.[0]?.toUpperCase() ?? 'U'}
                       </span>
-                      <span style={styles.perfilNombre}>{p.nombre}</span>
-                      <span style={styles.perfilMeta}>
-                        {p.tiene_pin ? 'PIN 4 dígitos' : 'Usar contraseña'}
+                      <span className="w-full truncate text-sm font-semibold text-[var(--color-text)]">
+                        {p.nombre}
+                      </span>
+                      <span className="text-[11px] font-medium text-[var(--color-muted)]">
+                        {p.tiene_pin ? 'PIN 4 dígitos' : 'Contraseña'}
                       </span>
                     </button>
                   ))}
                 </div>
               </>
             ) : (
-              <form onSubmit={handlePinSubmit} style={styles.form} noValidate>
-                <div style={styles.selectedProfileBar}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <form onSubmit={handlePinSubmit} className="flex flex-col gap-4" noValidate>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-subtle)] px-3.5 py-2.5">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
                       style={{
-                        ...styles.perfilAvatarSmall,
-                        background: perfilSeleccionado.avatar_color || 'var(--color-accent)',
+                        backgroundColor: perfilSeleccionado.avatar_color || 'var(--color-accent)',
                       }}
                     >
                       {perfilSeleccionado.nombre?.[0]?.toUpperCase() ?? 'U'}
                     </span>
-                    <div>
-                      <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--color-text)' }}>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[var(--color-text)]">
                         {perfilSeleccionado.nombre}
                       </p>
-                      <p style={{ fontSize: '0.76rem', color: 'var(--color-muted)' }}>
-                        Ingresa tu PIN de 4 dígitos
-                      </p>
+                      <p className="text-xs text-[var(--color-muted)]">Ingresa tu PIN</p>
                     </div>
                   </div>
                   <button
@@ -269,35 +317,72 @@ export default function LoginView() {
                       setPin('')
                       setError(null)
                     }}
-                    style={styles.backProfileBtn}
+                    className="btn btn-ghost min-h-[34px] px-2.5 text-xs"
                   >
                     <ArrowLeft size={14} /> Cambiar
                   </button>
                 </div>
 
-                <div style={styles.fieldGroup}>
-                  <label htmlFor="login-pin-input" style={styles.label}>
-                    PIN de Acceso (4 dígitos)
+                {/* Casillas visuales de PIN sincronizadas con el input real */}
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="login-pin-input"
+                    className="text-xs font-medium text-[var(--color-muted)]"
+                  >
+                    PIN de acceso (4 dígitos)
                   </label>
-                  <input
-                    id="login-pin-input"
-                    name="pin"
-                    type="password"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={4}
-                    className="input font-mono-num"
-                    placeholder="••••"
-                    value={pin}
-                    onChange={handlePinChange}
-                    autoFocus
-                    disabled={loading}
-                    style={styles.pinInput}
-                  />
+                  <div
+                    key={shakeKey}
+                    className={`relative ${shakeKey > 0 && error ? 'animate-shake' : ''}`}
+                    onClick={() => pinInputRef.current?.focus()}
+                  >
+                    <div className="grid grid-cols-4 gap-2.5" aria-hidden="true">
+                      {[0, 1, 2, 3].map((idx) => {
+                        const filled = idx < pin.length
+                        const isActive = idx === pin.length && !loading
+                        return (
+                          <div
+                            key={idx}
+                            className={[
+                              'flex h-14 items-center justify-center rounded-xl border text-xl font-bold transition-[border-color,background-color] duration-150',
+                              filled
+                                ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+                                : isActive
+                                  ? 'border-[var(--color-accent)] bg-[var(--color-surface)]'
+                                  : 'border-[var(--color-border-strong)] bg-[var(--color-surface)]',
+                            ].join(' ')}
+                          >
+                            {filled ? (
+                              <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-accent)]" />
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <input
+                      ref={pinInputRef}
+                      id="login-pin-input"
+                      name="pin"
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={pin}
+                      onChange={handlePinChange}
+                      autoFocus
+                      disabled={loading}
+                      autoComplete="one-time-code"
+                      aria-label="PIN de 4 dígitos"
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    />
+                  </div>
                 </div>
 
                 {error && (
-                  <div role="alert" style={styles.errorBox} className="animate-fade-in">
+                  <div
+                    role="alert"
+                    className="animate-fade-in rounded-xl border border-[rgba(196,62,59,0.28)] bg-[var(--color-danger-soft)] px-3.5 py-2.5 text-sm text-[var(--color-danger-text)]"
+                  >
                     {error}
                   </div>
                 )}
@@ -306,15 +391,10 @@ export default function LoginView() {
                   id="login-pin-submit"
                   type="submit"
                   disabled={loading || pin.length !== 4}
-                  className="btn btn-primary"
-                  style={styles.submitBtn}
+                  className="btn btn-primary min-h-[44px] w-full"
                 >
-                  {loading ? (
-                    <Spinner size="sm" color="currentColor" />
-                  ) : (
-                    <LogIn size={18} />
-                  )}
-                  {loading ? 'Verificando PIN...' : 'Desbloquear con PIN'}
+                  {loading ? <Spinner size="sm" color="currentColor" /> : <LogIn size={17} />}
+                  {loading ? 'Verificando PIN...' : 'Desbloquear'}
                 </button>
               </form>
             )}
@@ -323,9 +403,9 @@ export default function LoginView() {
 
         {/* PESTAÑA 2: USUARIO Y CONTRASEÑA */}
         {modo === 'password' && (
-          <form onSubmit={handlePasswordSubmit} noValidate style={styles.form}>
-            <div style={styles.fieldGroup}>
-              <label htmlFor="login-nombre" style={styles.label}>
+          <form onSubmit={handlePasswordSubmit} noValidate className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="login-nombre" className="text-xs font-medium text-[var(--color-muted)]">
                 Integrante / Usuario
               </label>
               <input
@@ -337,42 +417,46 @@ export default function LoginView() {
                 value={form.nombre}
                 onChange={handleChange}
                 autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
                 autoFocus
               />
             </div>
 
-            <div style={styles.fieldGroup}>
-              <label htmlFor="login-password" style={styles.label}>
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor="login-password"
+                className="text-xs font-medium text-[var(--color-muted)]"
+              >
                 Contraseña
               </label>
-              <div style={styles.passwordWrapper}>
+              <div className="relative">
                 <input
                   id="login-password"
                   name="password"
                   type={showPass ? 'text' : 'password'}
-                  className="input"
+                  className="input pr-11"
                   placeholder="••••••••"
                   value={form.password}
                   onChange={handleChange}
                   autoComplete="current-password"
-                  style={{ paddingRight: '44px' }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass((v) => !v)}
-                  style={styles.eyeBtn}
+                  className="btn-icon absolute right-1.5 top-1/2 -translate-y-1/2"
                   aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
-                  {showPass
-                    ? <EyeOff size={18} color="var(--color-muted)" />
-                    : <Eye    size={18} color="var(--color-muted)" />
-                  }
+                  {showPass ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div role="alert" style={styles.errorBox} className="animate-fade-in">
+              <div
+                role="alert"
+                className="animate-fade-in rounded-xl border border-[rgba(196,62,59,0.28)] bg-[var(--color-danger-soft)] px-3.5 py-2.5 text-sm text-[var(--color-danger-text)]"
+              >
                 {error}
               </div>
             )}
@@ -381,243 +465,18 @@ export default function LoginView() {
               id="login-submit"
               type="submit"
               disabled={loading}
-              className="btn btn-primary"
-              style={styles.submitBtn}
+              className="btn btn-primary mt-1 min-h-[44px] w-full"
             >
-              {loading ? (
-                <Spinner size="sm" color="currentColor" />
-              ) : (
-                <LogIn size={18} />
-              )}
+              {loading ? <Spinner size="sm" color="currentColor" /> : <LogIn size={17} />}
               {loading ? 'Ingresando...' : 'Iniciar sesión'}
             </button>
           </form>
         )}
 
-        {/* Footer */}
-        <p style={styles.footer}>
-          HomeOps Serverless &copy; {new Date().getFullYear()} · AWS CloudFront &amp; DynamoDB
+        <p className="mt-6 text-center text-xs text-[var(--color-muted)]">
+          HomeOps &copy; {new Date().getFullYear()} · Gestión familiar del hogar
         </p>
       </main>
     </div>
   )
-}
-
-const styles = {
-  page: {
-    minHeight: '100dvh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '24px',
-    background: 'var(--color-bg)',
-  },
-  cardWrapper: {
-    width: '100%',
-    maxWidth: '460px',
-    borderRadius: 'var(--radius-lg)',
-    padding: '36px 32px 28px',
-  },
-  logoArea: {
-    textAlign: 'center',
-    marginBottom: '24px',
-  },
-  logoIcon: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '52px',
-    height: '52px',
-    borderRadius: 'var(--radius-md)',
-    background: 'rgba(247, 148, 29, 0.14)',
-    border: '1px solid rgba(247, 148, 29, 0.32)',
-    marginBottom: '12px',
-  },
-  title: {
-    fontSize: '1.75rem',
-    fontWeight: 700,
-    color: 'var(--color-text)',
-    letterSpacing: '-0.03em',
-    lineHeight: 1.15,
-  },
-  subtitle: {
-    color: 'var(--color-muted)',
-    fontSize: '0.9rem',
-    marginTop: '6px',
-  },
-  modeTabs: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '6px',
-    padding: '4px',
-    background: 'var(--color-surface2)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-    marginBottom: '22px',
-  },
-  modeTab: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    minHeight: '38px',
-    padding: '8px 12px',
-    borderRadius: '6px',
-    border: 'none',
-    background: 'transparent',
-    color: 'var(--color-muted)',
-    fontSize: '0.84rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 150ms var(--ease)',
-  },
-  modeTabActive: {
-    background: 'var(--color-surface)',
-    color: 'var(--color-accent)',
-    boxShadow: 'inset 0 0 0 1px rgba(247, 148, 29, 0.35)',
-  },
-  helperText: {
-    fontSize: '0.86rem',
-    color: 'var(--color-muted)',
-    marginBottom: '14px',
-  },
-  perfilesGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(115px, 1fr))',
-    gap: '10px',
-  },
-  perfilCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '14px 10px',
-    borderRadius: 'var(--radius-md)',
-    background: 'var(--color-surface2)',
-    border: '1px solid var(--color-border)',
-    cursor: 'pointer',
-    transition: 'transform 150ms var(--ease), border-color 150ms var(--ease)',
-  },
-  perfilAvatar: {
-    width: '44px',
-    height: '44px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '1.1rem',
-    fontWeight: 700,
-    color: '#fff',
-  },
-  perfilAvatarSmall: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '0.95rem',
-    fontWeight: 700,
-    color: '#fff',
-    flexShrink: 0,
-  },
-  perfilNombre: {
-    fontSize: '0.9rem',
-    fontWeight: 600,
-    color: 'var(--color-text)',
-    maxWidth: '100%',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  perfilMeta: {
-    fontSize: '0.72rem',
-    color: 'var(--color-muted)',
-  },
-  emptyPerfiles: {
-    textAlign: 'center',
-    padding: '18px 12px',
-    background: 'var(--color-surface2)',
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--color-border)',
-  },
-  selectedProfileBar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '10px',
-    padding: '12px 14px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'var(--color-surface2)',
-    border: '1px solid var(--color-border)',
-  },
-  backProfileBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    background: 'transparent',
-    border: '1px solid var(--color-border)',
-    color: 'var(--color-muted)',
-    borderRadius: 'var(--radius-sm)',
-    padding: '6px 10px',
-    fontSize: '0.78rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  pinInput: {
-    textAlign: 'center',
-    fontSize: '1.5rem',
-    letterSpacing: '0.45em',
-    fontWeight: 600,
-    height: '52px',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '18px',
-  },
-  fieldGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  label: {
-    fontSize: '0.84rem',
-    fontWeight: 500,
-    color: 'var(--color-muted)',
-  },
-  passwordWrapper: {
-    position: 'relative',
-  },
-  eyeBtn: {
-    position: 'absolute',
-    right: '12px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '4px',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  errorBox: {
-    padding: '10px 14px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'rgba(239, 68, 68, 0.14)',
-    border: '1px solid rgba(239, 68, 68, 0.35)',
-    color: '#fca5a5',
-    fontSize: '0.875rem',
-  },
-  submitBtn: {
-    width: '100%',
-    justifyContent: 'center',
-    marginTop: '2px',
-  },
-  footer: {
-    textAlign: 'center',
-    marginTop: '26px',
-    color: 'var(--color-muted)',
-    fontSize: '0.78rem',
-  },
 }

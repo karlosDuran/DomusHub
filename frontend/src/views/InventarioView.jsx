@@ -9,9 +9,9 @@ import ProductoModal from '../components/ui/ProductoModal'
 import Modal from '../components/ui/Modal'
 import { toast } from 'react-hot-toast'
 
-// ── Componente: barra de stock coloreada ─────────────────────────────────────
+// ── Barra de stock GPU-only (scaleX) ─────────────────────────────────────────
 function StockBar({ porcentaje, critico }) {
-  const pct = Number(porcentaje) || 0
+  const pct = Math.max(0, Math.min(100, Number(porcentaje) || 0))
   const color = critico
     ? 'var(--color-danger)'
     : pct <= 50
@@ -19,10 +19,10 @@ function StockBar({ porcentaje, critico }) {
       : 'var(--color-success)'
 
   return (
-    <div className="stock-bar-track" style={{ marginTop: '10px' }}>
+    <div className="stock-bar-track mt-3">
       <div
         className="stock-bar-fill"
-        style={{ width: `${pct}%`, background: color }}
+        style={{ transform: `scaleX(${pct / 100})`, backgroundColor: color }}
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
@@ -32,102 +32,110 @@ function StockBar({ porcentaje, critico }) {
   )
 }
 
-// ── Componente: tarjeta de producto con consumo rápido -1 / +1 ───────────────
+// ── Tarjeta de producto con consumo rápido -1 / +1 ───────────────────────────
 function ProductoCard({ producto, onEdit, onDelete, onAjustarStock, adjusting }) {
   const pct = Number(producto.porcentaje_visual) || 0
   const critico = esProductoCritico(producto)
   const categoria = producto.categoria || 'Despensa'
 
   return (
-    <article className="card animate-fade-in-up" style={styles.card}>
-      <div style={styles.cardHeader}>
-        <div style={styles.cardIcon}>
-          <Package size={18} color="var(--color-accent)" />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={styles.titleRow}>
-            <h3 style={styles.cardTitle} title={producto.nombre}>
-              {producto.nombre}
-            </h3>
-            <span className="badge badge-neutral" style={{ fontSize: '0.7rem' }}>
-              {categoria}
-            </span>
+    <article
+      className={[
+        'surface-card surface-card-interactive group flex flex-col justify-between p-4',
+        critico ? 'border-[rgba(196,62,59,0.28)]' : '',
+      ].join(' ')}
+    >
+      <div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3
+                className="truncate text-[0.95rem] font-semibold text-[var(--color-text)]"
+                title={producto.nombre}
+              >
+                {producto.nombre}
+              </h3>
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="badge badge-neutral text-[11px]">{categoria}</span>
+              {producto.precio_promedio ? (
+                <span className="font-mono-num text-xs text-[var(--color-muted)]">
+                  ${Number(producto.precio_promedio).toFixed(2)}
+                </span>
+              ) : null}
+            </div>
           </div>
-          <p style={styles.cardSub} className="font-mono-num">
-            <strong>{producto.cantidad_actual}</strong> {producto.unidad_medida}{' '}
-            <span style={{ color: 'var(--color-muted)' }}>
-              (mín. {producto.cantidad_minima})
-            </span>
-          </p>
+
+          <div className="flex shrink-0 items-center gap-0.5 md:opacity-65 md:transition-opacity md:duration-150 md:group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={() => onEdit(producto)}
+              className="btn-icon h-8 w-8"
+              title="Editar producto"
+              aria-label={`Editar ${producto.nombre}`}
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(producto)}
+              className="btn-icon btn-icon-danger h-8 w-8"
+              title="Eliminar producto"
+              aria-label={`Eliminar ${producto.nombre}`}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         </div>
 
-        {/* Acciones de Edición / Borrado */}
-        <div className="actions" style={styles.actions}>
-          <button
-            type="button"
-            onClick={() => onEdit(producto)}
-            style={styles.actionBtn}
-            title="Editar producto"
-            aria-label={`Editar ${producto.nombre}`}
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(producto)}
-            className="action-btn-danger"
-            style={styles.actionBtn}
-            title="Eliminar producto"
-            aria-label={`Eliminar ${producto.nombre}`}
-          >
-            <Trash2 size={14} />
-          </button>
+        <div className="mt-3 flex items-baseline justify-between gap-2">
+          <p className="font-mono-num text-sm text-[var(--color-text)]">
+            <strong className="text-base font-semibold">{producto.cantidad_actual}</strong>{' '}
+            <span className="text-[var(--color-muted)]">{producto.unidad_medida}</span>
+          </p>
+          <span className="font-mono-num text-xs text-[var(--color-muted)]">
+            mín. {producto.cantidad_minima}
+          </span>
         </div>
+
+        <StockBar porcentaje={pct} critico={critico} />
       </div>
 
-      <StockBar porcentaje={pct} critico={critico} />
-
-      {/* Fila inferior: Estado + Controles rápidos de cocina (-1 / +1) */}
-      <div style={styles.cardFooter}>
+      {/* Pie: Estado + Controles táctiles rápidos (-1 / +1) */}
+      <div className="mt-4 flex items-center justify-between gap-2">
         <div>
           {critico ? (
-            <span className="badge badge-danger">
-              <AlertTriangle size={12} /> Crítico ({pct}%)
+            <span className="badge badge-danger font-mono-num">
+              <AlertTriangle size={12} /> Crítico · {pct}%
             </span>
           ) : pct <= 50 ? (
             <span className="badge badge-warning font-mono-num">{pct}%</span>
           ) : (
             <span className="badge badge-success font-mono-num">{pct}%</span>
           )}
-
-          {producto.precio_promedio ? (
-            <span style={styles.cardPrice} className="font-mono-num">
-              ${Number(producto.precio_promedio).toFixed(2)}
-            </span>
-          ) : null}
         </div>
 
-        {/* Botones rápidos -1 / +1 (disparan DynamoDB Streams → SNS al llegar al mínimo) */}
-        <div style={styles.quickStockGroup} aria-label={`Ajustar stock de ${producto.nombre}`}>
+        <div
+          className="inline-flex items-center gap-1.5"
+          aria-label={`Ajustar stock de ${producto.nombre}`}
+        >
           <button
             type="button"
-            className="qtyBtn font-mono-num"
-            style={styles.quickStockBtn}
             disabled={adjusting || Number(producto.cantidad_actual) <= 0}
             onClick={() => onAjustarStock(producto, -1)}
-            title="Descontar 1 unidad en cocina"
+            title="Descontar 1 unidad"
             aria-label={`Restar 1 a ${producto.nombre}`}
+            className="btn btn-ghost font-mono-num min-h-[34px] px-2.5 text-xs"
           >
             <Minus size={13} /> 1
           </button>
           <button
             type="button"
-            className="qtyBtn font-mono-num"
-            style={styles.quickStockBtn}
             disabled={adjusting}
             onClick={() => onAjustarStock(producto, 1)}
             title="Sumar 1 unidad"
             aria-label={`Sumar 1 a ${producto.nombre}`}
+            className="btn btn-ghost font-mono-num min-h-[34px] px-2.5 text-xs"
           >
             <Plus size={13} /> 1
           </button>
@@ -137,29 +145,25 @@ function ProductoCard({ producto, onEdit, onDelete, onAjustarStock, adjusting })
   )
 }
 
-// ── Skeleton cards ────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div style={styles.skeletonCard}>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <div
-          className="skeleton"
-          style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
-        />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div className="skeleton" style={{ height: '14px', width: '60%', borderRadius: '4px' }} />
-          <div className="skeleton" style={{ height: '12px', width: '40%', borderRadius: '4px' }} />
+    <div className="surface-card p-4">
+      <div className="flex flex-col gap-2">
+        <div className="skeleton h-4 w-3/5 rounded" />
+        <div className="skeleton h-3 w-1/3 rounded" />
+      </div>
+      <div className="skeleton mt-5 h-1.5 w-full rounded-full" />
+      <div className="mt-4 flex items-center justify-between">
+        <div className="skeleton h-5 w-16 rounded-full" />
+        <div className="flex gap-1.5">
+          <div className="skeleton h-8 w-12 rounded-lg" />
+          <div className="skeleton h-8 w-12 rounded-lg" />
         </div>
       </div>
-      <div
-        className="skeleton"
-        style={{ height: '6px', width: '100%', borderRadius: '999px', marginTop: '12px' }}
-      />
     </div>
   )
 }
 
-// ── Vista principal ───────────────────────────────────────────────────────────
 export default function InventarioView() {
   const productos = useInventarioStore((s) => s.productos)
   const loading = useInventarioStore((s) => s.loading)
@@ -175,11 +179,10 @@ export default function InventarioView() {
     fetchProductos()
   }, [fetchProductos])
 
-  const [filtro, setFiltro] = useState('todo') // 'todo' | 'critico'
+  const [filtro, setFiltro] = useState('todo')
   const [categoriaActiva, setCategoriaActiva] = useState('Todas')
   const [adjustingId, setAdjustingId] = useState(null)
 
-  // Modales states
   const [modalProducto, setModalProducto] = useState({ open: false, producto: null })
   const [modalEliminar, setModalEliminar] = useState({ open: false, producto: null })
   const [loadingDelete, setLoadingDelete] = useState(false)
@@ -208,8 +211,7 @@ export default function InventarioView() {
       const actualizado = await ajustarStock(producto.id, delta)
       if (delta < 0 && esProductoCritico(actualizado)) {
         toast(
-          `Stock crítico de ${actualizado.nombre} (${actualizado.cantidad_actual} ${actualizado.unidad_medida}). DynamoDB Streams notificará por SNS.`,
-          { icon: '⚠️' }
+          `Stock crítico de ${actualizado.nombre} (${actualizado.cantidad_actual} ${actualizado.unidad_medida}). Se notificará por SNS.`
         )
       }
     } catch (err) {
@@ -224,7 +226,7 @@ export default function InventarioView() {
     setLoadingDelete(true)
     try {
       await eliminarProducto(modalEliminar.producto.id)
-      toast.success('Producto eliminado correctamente')
+      toast.success('Producto eliminado')
       setModalEliminar({ open: false, producto: null })
     } catch {
       toast.error('Error al intentar eliminar el producto.')
@@ -234,14 +236,14 @@ export default function InventarioView() {
   }
 
   return (
-    <div id="inventario-page" style={styles.page}>
+    <div id="inventario-page" className="mx-auto max-w-[1120px]">
       {/* Header */}
-      <header style={styles.header}>
+      <header className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <h1 style={styles.pageTitle}>Despensa</h1>
-          <p style={styles.pageSubtitle}>
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">Despensa</h1>
+          <p className="mt-0.5 text-sm text-[var(--color-muted)]">
             {loading
-              ? '…'
+              ? 'Actualizando inventario…'
               : `${productos.length} producto${productos.length !== 1 ? 's' : ''} en inventario`}
           </p>
         </div>
@@ -251,106 +253,131 @@ export default function InventarioView() {
           id="inventario-add-btn"
           onClick={() => setModalProducto({ open: true, producto: null })}
         >
-          <Plus size={18} /> Agregar
+          <Plus size={17} /> Agregar
         </button>
       </header>
 
-      {/* Tabs de estado: Todo / Crítico */}
-      <div style={styles.tabs} role="tablist" aria-label="Filtro de estado de stock">
-        {[
-          { key: 'todo',    label: 'Todo' },
-          { key: 'critico', label: '⚠ Crítico' },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={filtro === key}
-            onClick={() => setFiltro(key)}
-            style={{
-              ...styles.tab,
-              ...(filtro === key ? styles.tabActive : {}),
-            }}
-          >
-            {label}
-            {key === 'critico' && !loading && (
-              <span style={styles.tabBadge} className="font-mono-num">
-                {totalCriticos}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Selector de estado: Todo / Crítico */}
+      <div className="mb-3 flex flex-wrap items-center gap-2" role="tablist" aria-label="Filtro de estado de stock">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={filtro === 'todo'}
+          onClick={() => setFiltro('todo')}
+          className={[
+            'inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold transition-[background-color,border-color,color] duration-150 active:scale-[0.97]',
+            filtro === 'todo'
+              ? 'border-[var(--color-accent-border)] bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
+              : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-[var(--color-text)]',
+          ].join(' ')}
+        >
+          Todo
+        </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={filtro === 'critico'}
+          onClick={() => setFiltro('critico')}
+          className={[
+            'inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold transition-[background-color,border-color,color] duration-150 active:scale-[0.97]',
+            filtro === 'critico'
+              ? 'border-[rgba(196,62,59,0.34)] bg-[var(--color-danger-soft)] text-[var(--color-danger-text)]'
+              : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-[var(--color-text)]',
+          ].join(' ')}
+        >
+          <AlertTriangle size={14} />
+          Crítico
+          {!loading && (
+            <span className="font-mono-num ml-0.5 rounded-full bg-[var(--color-danger)] px-1.5 py-0.5 text-[11px] font-bold leading-none text-white">
+              {totalCriticos}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Pills de categoría */}
-      <div style={styles.categoryScroll} role="tablist" aria-label="Filtro por categoría">
-        {['Todas', ...CATEGORIAS_INVENTARIO].map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            role="tab"
-            aria-selected={categoriaActiva === cat}
-            onClick={() => setCategoriaActiva(cat)}
-            style={{
-              ...styles.catPill,
-              ...(categoriaActiva === cat ? styles.catPillActive : {}),
-            }}
-          >
-            {cat}
-          </button>
-        ))}
+      <div
+        className="pill-bar mb-5 pb-1 md:flex-wrap md:overflow-visible"
+        role="tablist"
+        aria-label="Filtro por categoría"
+      >
+        {['Todas', ...CATEGORIAS_INVENTARIO].map((cat) => {
+          const active = categoriaActiva === cat
+          return (
+            <button
+              key={cat}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setCategoriaActiva(cat)}
+              className={[
+                'shrink-0 cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-[background-color,border-color,color] duration-150 active:scale-[0.97]',
+                active
+                  ? 'border-[var(--color-accent)] bg-[var(--color-accent)] font-semibold text-[var(--color-accent-ink)]'
+                  : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-[var(--color-text)]',
+              ].join(' ')}
+            >
+              {cat}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Estado: cargando */}
+      {/* Cargando */}
       {loading && (
-        <div style={styles.skeletonGrid}>
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
             <SkeletonCard key={i} />
           ))}
         </div>
       )}
 
-      {/* Estado: error */}
+      {/* Error */}
       {!loading && error && (
-        <div style={styles.errorState} className="animate-fade-in">
-          <AlertTriangle size={32} color="var(--color-danger)" />
-          <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>Error al cargar</p>
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>{error}</p>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={refetch}
-            style={{ marginTop: '8px' }}
-          >
-            <RefreshCw size={16} /> Reintentar
+        <div className="animate-fade-in flex flex-col items-center gap-2 py-14 text-center">
+          <AlertTriangle size={28} className="text-[var(--color-danger)]" />
+          <p className="font-semibold text-[var(--color-danger-text)]">Error al cargar</p>
+          <p className="max-w-sm text-sm text-[var(--color-muted)]">{error}</p>
+          <button type="button" className="btn btn-ghost mt-2" onClick={refetch}>
+            <RefreshCw size={15} /> Reintentar
           </button>
         </div>
       )}
 
-      {/* Estado: vacío */}
+      {/* Vacío */}
       {!loading && !error && productosFiltrados.length === 0 && (
-        <div style={styles.emptyState} className="animate-fade-in">
-          <div style={styles.emptyIcon}>
-            <Package size={36} color="var(--color-muted)" />
+        <div className="animate-fade-in flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] px-6 py-14 text-center">
+          <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-surface-subtle)] text-[var(--color-muted)]">
+            <Package size={24} />
           </div>
-          <p style={{ color: 'var(--color-text)', fontWeight: 600 }}>
+          <p className="font-semibold text-[var(--color-text)]">
             {filtro === 'critico'
-              ? '¡Todo el stock está en buen nivel!'
+              ? 'Todo el stock está en buen nivel'
               : categoriaActiva !== 'Todas'
                 ? `Sin productos en "${categoriaActiva}"`
-                : 'No hay productos aún'}
+                : 'Tu despensa aún está vacía'}
           </p>
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+          <p className="max-w-sm text-sm text-[var(--color-muted)]">
             {filtro === 'critico'
-              ? 'No hay productos en umbral crítico.'
+              ? 'No hay productos en umbral crítico en este momento.'
               : 'Agrega productos a tu despensa o cambia el filtro de categoría.'}
           </p>
+          {filtro === 'todo' && categoriaActiva === 'Todas' && (
+            <button
+              type="button"
+              className="btn btn-primary mt-3"
+              onClick={() => setModalProducto({ open: true, producto: null })}
+            >
+              <Plus size={16} /> Agregar primer producto
+            </button>
+          )}
         </div>
       )}
 
-      {/* Lista de productos */}
+      {/* Grid de productos */}
       {!loading && !error && productosFiltrados.length > 0 && (
-        <div style={styles.grid}>
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {productosFiltrados.map((p) => (
             <ProductoCard
               key={p.id}
@@ -364,7 +391,6 @@ export default function InventarioView() {
         </div>
       )}
 
-      {/* Modal de formulario: Crear / Editar */}
       <ProductoModal
         isOpen={modalProducto.open}
         onClose={() => setModalProducto({ open: false, producto: null })}
@@ -372,207 +398,16 @@ export default function InventarioView() {
         producto={modalProducto.producto}
       />
 
-      {/* Modal de confirmación de eliminación */}
       <Modal
         isOpen={modalEliminar.open}
         onClose={() => setModalEliminar({ open: false, producto: null })}
         onConfirm={handleConfirmEliminar}
-        title="Eliminar Producto"
-        message={`¿Estás seguro de que deseas eliminar "${modalEliminar.producto?.nombre}" del inventario? Esta acción no se puede deshacer.`}
+        title="Eliminar producto"
+        message={`¿Seguro que deseas eliminar "${modalEliminar.producto?.nombre}" del inventario? Esta acción no se puede deshacer.`}
         confirmText="Eliminar"
         variant="danger"
         loading={loadingDelete}
       />
     </div>
   )
-}
-
-const styles = {
-  page: { maxWidth: '820px', margin: '0 auto' },
-  header: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: '16px',
-    marginBottom: '18px',
-  },
-  pageTitle: {
-    fontSize: '1.6rem',
-    fontWeight: 700,
-    color: 'var(--color-text)',
-  },
-  pageSubtitle: { color: 'var(--color-muted)', fontSize: '0.875rem', marginTop: '2px' },
-  tabs: { display: 'flex', gap: '8px', marginBottom: '12px' },
-  tab: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '7px 16px',
-    borderRadius: '999px',
-    border: '1px solid var(--color-border)',
-    background: 'transparent',
-    color: 'var(--color-muted)',
-    fontSize: '0.875rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 150ms var(--ease)',
-  },
-  tabActive: {
-    background: 'rgba(247, 148, 29, 0.14)',
-    borderColor: 'rgba(247, 148, 29, 0.45)',
-    color: 'var(--color-accent)',
-  },
-  tabBadge: {
-    background: 'var(--color-danger)',
-    color: '#fff',
-    borderRadius: '999px',
-    padding: '1px 7px',
-    fontSize: '0.72rem',
-    fontWeight: 700,
-  },
-  categoryScroll: {
-    display: 'flex',
-    gap: '6px',
-    overflowX: 'auto',
-    paddingBottom: '12px',
-    marginBottom: '12px',
-  },
-  catPill: {
-    padding: '5px 13px',
-    borderRadius: '999px',
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-surface)',
-    color: 'var(--color-muted)',
-    fontSize: '0.8rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    transition: 'all 150ms var(--ease)',
-  },
-  catPillActive: {
-    background: 'var(--color-surface2)',
-    borderColor: 'var(--color-accent)',
-    color: 'var(--color-text)',
-    fontWeight: 600,
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-    gap: '14px',
-  },
-  skeletonGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-    gap: '14px',
-  },
-  card: { padding: '16px', position: 'relative' },
-  cardHeader: { display: 'flex', alignItems: 'flex-start', gap: '12px' },
-  cardIcon: {
-    width: '36px',
-    height: '36px',
-    borderRadius: 'var(--radius-sm)',
-    background: 'rgba(247, 148, 29, 0.12)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  titleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    flexWrap: 'wrap',
-    marginBottom: '2px',
-  },
-  cardTitle: {
-    fontSize: '0.96rem',
-    fontWeight: 600,
-    color: 'var(--color-text)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  cardSub: { fontSize: '0.82rem', color: 'var(--color-text)' },
-  cardFooter: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '10px',
-    marginTop: '12px',
-  },
-  cardPrice: {
-    fontSize: '0.78rem',
-    color: 'var(--color-muted)',
-    marginLeft: '8px',
-  },
-  quickStockGroup: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-  },
-  quickStockBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '3px',
-    height: '32px',
-    padding: '0 10px',
-    borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--color-border-strong)',
-    background: 'var(--color-surface2)',
-    color: 'var(--color-text)',
-    fontSize: '0.78rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'background 150ms var(--ease)',
-  },
-  actions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    flexShrink: 0,
-    marginLeft: 'auto',
-  },
-  actionBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--color-muted)',
-    padding: '6px',
-    borderRadius: 'var(--radius-sm)',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  skeletonCard: {
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-md)',
-    padding: '16px',
-  },
-  emptyState: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '60px 24px',
-    textAlign: 'center',
-  },
-  emptyIcon: {
-    width: '72px',
-    height: '72px',
-    borderRadius: 'var(--radius-lg)',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '8px',
-  },
-  errorState: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '48px 24px',
-    textAlign: 'center',
-  },
 }

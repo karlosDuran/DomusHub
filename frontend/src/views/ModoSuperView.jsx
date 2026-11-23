@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, CheckCircle, AlertTriangle, RefreshCw, Plus, Minus, X } from 'lucide-react'
+import {
+  ShoppingCart,
+  CheckCircle,
+  AlertTriangle,
+  RefreshCw,
+  Plus,
+  Minus,
+  X,
+  Check,
+} from 'lucide-react'
 import { useModoSuper } from '../hooks/useModoSuper'
 import { toast } from 'react-hot-toast'
 import Spinner from '../components/ui/Spinner'
@@ -55,11 +64,13 @@ export default function ModoSuperView() {
     return sum + Number(item.precio_pagado || 0) * Number(item.cantidad_comprada || 0)
   }, 0)
 
+  const cantidadEnCarrito = Object.keys(carrito).length
+
   const handleFinalizar = async () => {
-    if (Object.keys(carrito).length === 0) return
+    if (cantidadEnCarrito === 0) return
     try {
       await finalizarCompra()
-      toast.success('¡Compra registrada y despensa actualizada!')
+      toast.success('Compra registrada y despensa actualizada')
     } catch (err) {
       const msg = err.response?.data?.error ?? 'Ocurrió un error al registrar la compra.'
       toast.error(msg)
@@ -67,53 +78,46 @@ export default function ModoSuperView() {
   }
 
   return (
-    <div id="supermercado-page" style={styles.page}>
+    <div id="supermercado-page" className="mx-auto max-w-[1040px] pb-28">
       {/* Header */}
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.pageTitle}>Modo Supermercado</h1>
-          <p style={styles.pageSubtitle}>
-            {loading
-              ? '…'
-              : `${criticos.length} insumo${criticos.length !== 1 ? 's' : ''} en nivel crítico`}
-          </p>
-        </div>
+      <header className="mb-5">
+        <h1 className="text-2xl font-bold text-[var(--color-text)]">Modo supermercado</h1>
+        <p className="mt-0.5 text-sm text-[var(--color-muted)]">
+          {loading
+            ? 'Buscando productos críticos…'
+            : `${criticos.length} insumo${criticos.length !== 1 ? 's' : ''} por reponer`}
+        </p>
       </header>
 
-      {/* Estado: cargando */}
+      {/* Cargando */}
       {loading && (
-        <div style={styles.list}>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="skeleton" style={styles.skeletonItem} />
+            <div key={i} className="skeleton h-20 rounded-xl" />
           ))}
         </div>
       )}
 
-      {/* Estado: error */}
+      {/* Error */}
       {!loading && error && (
-        <div style={styles.centerState} className="animate-fade-in">
-          <AlertTriangle size={32} color="var(--color-danger)" />
-          <p style={{ color: 'var(--color-danger)', fontWeight: 600 }}>Error al cargar críticos</p>
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>{error}</p>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={refetch}
-            style={{ marginTop: '8px' }}
-          >
-            <RefreshCw size={16} /> Reintentar
+        <div className="animate-fade-in flex flex-col items-center gap-2 py-14 text-center">
+          <AlertTriangle size={28} className="text-[var(--color-danger)]" />
+          <p className="font-semibold text-[var(--color-danger-text)]">Error al cargar críticos</p>
+          <p className="text-sm text-[var(--color-muted)]">{error}</p>
+          <button type="button" className="btn btn-ghost mt-2" onClick={refetch}>
+            <RefreshCw size={15} /> Reintentar
           </button>
         </div>
       )}
 
-      {/* Estado: despensa llena / vacío */}
+      {/* Despensa completa */}
       {!loading && !error && criticos.length === 0 && (
-        <div style={styles.centerState} className="animate-fade-in">
-          <div style={styles.successIcon}>
-            <CheckCircle size={36} color="var(--color-success)" />
+        <div className="animate-fade-in flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] px-6 py-14 text-center">
+          <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-success-soft)] text-[var(--color-success)]">
+            <CheckCircle size={26} />
           </div>
-          <p style={{ color: 'var(--color-text)', fontWeight: 600 }}>¡Despensa Completa!</p>
-          <p style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+          <p className="font-semibold text-[var(--color-text)]">Despensa completa</p>
+          <p className="max-w-sm text-sm text-[var(--color-muted)]">
             No hay productos con stock crítico en este momento.
           </p>
         </div>
@@ -121,7 +125,7 @@ export default function ModoSuperView() {
 
       {/* Lista de productos críticos */}
       {!loading && !error && criticos.length > 0 && (
-        <div style={styles.list}>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {criticos.map((p) => {
             const enCarrito = !!carrito[p.id]
             const item = carrito[p.id]
@@ -130,85 +134,102 @@ export default function ModoSuperView() {
             return (
               <div
                 key={p.id}
-                className="card m-nolift animate-fade-in-up"
-                style={{
-                  ...styles.itemCard,
-                  borderColor: enCarrito ? 'var(--color-accent)' : 'var(--color-border)',
-                  background: enCarrito
-                    ? 'rgba(247, 148, 29, 0.06)'
-                    : 'var(--color-surface)',
-                }}
+                className={[
+                  'surface-card flex flex-col gap-3 p-4 transition-[border-color,background-color] duration-150',
+                  enCarrito
+                    ? 'border-[var(--color-accent-border)] bg-[var(--color-accent-soft)]'
+                    : '',
+                ].join(' ')}
               >
-                {/* Fila Principal */}
-                <div style={styles.itemMainRow}>
-                  <label style={styles.checkboxLabel}>
+                {/* Fila principal táctil */}
+                <label className="flex cursor-pointer items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     <input
                       type="checkbox"
                       checked={enCarrito}
                       onChange={() => toggleCarrito(p)}
                       disabled={submitting}
-                      style={styles.checkbox}
+                      className="sr-only"
                     />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span
+                      aria-hidden="true"
+                      className={[
+                        'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition-[background-color,border-color,transform] duration-150 active:scale-95',
+                        enCarrito
+                          ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-ink)]'
+                          : 'border-[var(--color-border-strong)] bg-[var(--color-surface)] text-transparent',
+                      ].join(' ')}
+                    >
+                      <Check size={14} strokeWidth={2.8} />
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span
-                          style={{
-                            ...styles.itemName,
-                            textDecoration: enCarrito ? 'line-through' : 'none',
-                            color: enCarrito ? 'var(--color-muted)' : 'var(--color-text)',
-                          }}
+                          className={[
+                            'truncate text-[0.95rem] font-semibold transition-colors duration-150',
+                            enCarrito
+                              ? 'text-[var(--color-muted)] line-through'
+                              : 'text-[var(--color-text)]',
+                          ].join(' ')}
                         >
                           {p.nombre}
                         </span>
-                        <span className="badge badge-neutral" style={{ fontSize: '0.68rem' }}>
-                          {categoria}
-                        </span>
+                        <span className="badge badge-neutral text-[11px]">{categoria}</span>
                       </div>
-                      <div style={styles.itemMeta} className="font-mono-num">
-                        <span style={styles.metaLabel}>
-                          Mínimo: {p.cantidad_minima} {p.unidad_medida}
+                      <div className="font-mono-num mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="text-[var(--color-muted)]">
+                          Mín: {p.cantidad_minima} {p.unidad_medida}
                         </span>
-                        <span style={styles.separator}>•</span>
-                        <span style={styles.metaLabelDanger}>
+                        <span className="text-[var(--color-border-strong)]">·</span>
+                        <span className="font-semibold text-[var(--color-danger-text)]">
                           Actual: {p.cantidad_actual} {p.unidad_medida}
                         </span>
                       </div>
                     </div>
-                  </label>
+                  </div>
 
-                  <span className="badge badge-danger font-mono-num">
+                  <span className="badge badge-danger font-mono-num shrink-0">
                     {p.porcentaje_visual}%
                   </span>
-                </div>
+                </label>
 
-                {/* Campos del Carrito */}
+                {/* Campos de precio y cantidad cuando está en carrito */}
                 {enCarrito && item && (
-                  <div style={styles.cartInputs} className="animate-fade-in-up">
-                    {/* Input: Precio pagado */}
-                    <div style={styles.inputGroup}>
-                      <span style={styles.inputLabel}>Precio unitario pagado</span>
-                      <div style={{ position: 'relative' }}>
-                        <span style={styles.currencyIcon}>$</span>
+                  <div className="animate-enter grid grid-cols-2 gap-3 border-t border-[var(--color-border)] pt-3">
+                    <div className="flex flex-col gap-1">
+                      <label
+                        htmlFor={`super-price-${p.id}`}
+                        className="text-[11px] font-medium text-[var(--color-muted)]"
+                      >
+                        Precio unitario
+                      </label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[var(--color-muted)]">
+                          $
+                        </span>
                         <input
+                          id={`super-price-${p.id}`}
+                          name={`precio_${p.id}`}
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           min="0"
                           value={item.precio_pagado}
                           onChange={(e) => actualizarItem(p.id, 'precio_pagado', e.target.value)}
                           disabled={submitting}
-                          style={styles.inlineInputPrice}
-                          className="font-mono-num"
+                          className="input font-mono-num min-h-[38px] py-1.5 pl-7 text-sm"
                         />
                       </div>
                     </div>
 
-                    {/* Selector de cantidad comprada */}
-                    <div style={styles.inputGroup}>
-                      <span style={styles.inputLabel}>Cantidad comprada</span>
-                      <div style={styles.quantityControls}>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] font-medium text-[var(--color-muted)]">
+                        Cantidad comprada
+                      </span>
+                      <div className="flex h-[38px] items-center overflow-hidden rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)]">
                         <button
                           type="button"
-                          className="qtyBtn"
                           onClick={() =>
                             actualizarItem(
                               p.id,
@@ -217,26 +238,27 @@ export default function ModoSuperView() {
                             )
                           }
                           disabled={submitting || item.cantidad_comprada <= 1}
-                          style={styles.qtyBtn}
+                          className="flex h-full w-9 shrink-0 cursor-pointer items-center justify-center text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-subtle)] active:scale-95 disabled:opacity-35"
                           aria-label={`Disminuir cantidad de ${p.nombre}`}
                         >
-                          <Minus size={12} />
+                          <Minus size={14} />
                         </button>
-                        <span style={styles.qtyText} className="font-mono-num">
-                          {item.cantidad_comprada}{' '}
-                          <small style={{ color: 'var(--color-muted)' }}>{p.unidad_medida}</small>
+                        <span className="font-mono-num flex h-full flex-1 items-center justify-center gap-1 border-x border-[var(--color-border)] px-2 text-sm font-semibold text-[var(--color-text)]">
+                          {item.cantidad_comprada}
+                          <small className="text-[11px] font-normal text-[var(--color-muted)]">
+                            {p.unidad_medida}
+                          </small>
                         </span>
                         <button
                           type="button"
-                          className="qtyBtn"
                           onClick={() =>
                             actualizarItem(p.id, 'cantidad_comprada', item.cantidad_comprada + 1)
                           }
                           disabled={submitting}
-                          style={styles.qtyBtn}
+                          className="flex h-full w-9 shrink-0 cursor-pointer items-center justify-center text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-subtle)] active:scale-95 disabled:opacity-35"
                           aria-label={`Aumentar cantidad de ${p.nombre}`}
                         >
-                          <Plus size={12} />
+                          <Plus size={14} />
                         </button>
                       </div>
                     </div>
@@ -248,33 +270,39 @@ export default function ModoSuperView() {
         </div>
       )}
 
-      {/* Sección: Agregar manualmente (persistida en localStorage) */}
-      <div style={{ ...styles.list, marginTop: '28px' }}>
-        <h2 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--color-text)', marginBottom: '4px' }}>
-          Notas y artículos extra de compra
+      {/* Notas y artículos extra */}
+      <section className="mt-8 max-w-xl">
+        <h2 className="mb-2.5 text-base font-semibold text-[var(--color-text)]">
+          Notas y artículos extra
         </h2>
-        <form onSubmit={handleAddTemp} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <form onSubmit={handleAddTemp} className="mb-3 flex gap-2">
           <input
+            id="super-nota-extra"
+            name="nota_extra"
             type="text"
             className="input"
             placeholder="Ej. Servilletas, pan, bolsas de basura..."
             value={inputTemp}
             onChange={(e) => setInputTemp(e.target.value)}
+            enterKeyHint="done"
           />
-          <button type="submit" className="btn btn-ghost" style={{ padding: '0 16px' }} aria-label="Agregar nota">
+          <button type="submit" className="btn btn-ghost shrink-0 px-3.5" aria-label="Agregar nota">
             <Plus size={18} />
           </button>
         </form>
 
         {itemsTemp.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="flex flex-col gap-2">
             {itemsTemp.map((item) => (
-              <div key={item.id} style={styles.tempItem} className="animate-fade-in-up">
-                <span style={{ fontSize: '0.9rem', color: 'var(--color-text)' }}>{item.nombre}</span>
+              <div
+                key={item.id}
+                className="surface-card flex items-center justify-between gap-3 px-3.5 py-2.5"
+              >
+                <span className="text-sm text-[var(--color-text)]">{item.nombre}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveTemp(item.id)}
-                  style={styles.actionBtnDanger}
+                  className="btn-icon btn-icon-danger h-7 w-7"
                   title="Eliminar nota"
                   aria-label={`Eliminar ${item.nombre}`}
                 >
@@ -284,15 +312,18 @@ export default function ModoSuperView() {
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Barra de acción fija inferior (Total + Finalizar) */}
-      {Object.keys(carrito).length > 0 && (
-        <div className="super-bottom-bar" style={styles.bottomBar}>
-          <div style={styles.bottomBarContent}>
+      {/* Barra flotante inferior de compra */}
+      {cantidadEnCarrito > 0 && (
+        <div
+          className="super-checkout-bar fixed right-0 left-0 bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom,0px))] z-30 border-t border-[var(--color-border-strong)] bg-[var(--color-surface-elevated)] md:bottom-0 md:left-[var(--sidenav-width)]"
+          style={{ boxShadow: 'var(--shadow-bar)' }}
+        >
+          <div className="mx-auto flex max-w-[1040px] items-center justify-between gap-4 px-4 py-3 sm:px-6 md:px-9">
             <div>
-              <p style={styles.totalLabel}>Total Estimado</p>
-              <p style={styles.totalVal} className="font-mono-num">
+              <p className="text-xs font-medium text-[var(--color-muted)]">Total estimado</p>
+              <p className="font-mono-num text-xl font-bold leading-tight text-[var(--color-accent)]">
                 ${total.toFixed(2)}
               </p>
             </div>
@@ -300,244 +331,18 @@ export default function ModoSuperView() {
               type="button"
               onClick={handleFinalizar}
               disabled={submitting}
-              className="btn btn-primary"
-              style={styles.finishBtn}
+              className="btn btn-primary min-h-[44px] px-5"
             >
               {submitting ? (
                 <Spinner size="sm" color="currentColor" />
               ) : (
-                <ShoppingCart size={18} />
+                <ShoppingCart size={17} />
               )}
-              {submitting ? 'Guardando…' : `Registrar compra (${Object.keys(carrito).length})`}
+              {submitting ? 'Guardando…' : `Registrar compra (${cantidadEnCarrito})`}
             </button>
           </div>
         </div>
       )}
     </div>
   )
-}
-
-const styles = {
-  page: {
-    maxWidth: '680px',
-    margin: '0 auto',
-    paddingBottom: '104px',
-  },
-  header: {
-    marginBottom: '20px',
-  },
-  pageTitle: {
-    fontSize: '1.6rem',
-    fontWeight: 700,
-    color: 'var(--color-text)',
-  },
-  pageSubtitle: { color: 'var(--color-muted)', fontSize: '0.875rem', marginTop: '2px' },
-  list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  },
-  skeletonItem: {
-    height: '76px',
-    borderRadius: 'var(--radius-md)',
-  },
-  itemCard: {
-    padding: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  },
-  itemMainRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '12px',
-  },
-  checkboxLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    cursor: 'pointer',
-    flex: 1,
-    minWidth: 0,
-  },
-  checkbox: {
-    width: '18px',
-    height: '18px',
-    borderRadius: '4px',
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-surface2)',
-    cursor: 'pointer',
-    accentColor: 'var(--color-accent)',
-    flexShrink: 0,
-  },
-  itemName: {
-    fontSize: '0.96rem',
-    fontWeight: 600,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  itemMeta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    marginTop: '3px',
-    flexWrap: 'wrap',
-  },
-  metaLabel: {
-    fontSize: '0.76rem',
-    color: 'var(--color-muted)',
-  },
-  metaLabelDanger: {
-    fontSize: '0.76rem',
-    color: '#f87171',
-    fontWeight: 600,
-  },
-  separator: {
-    fontSize: '0.76rem',
-    color: 'var(--color-border)',
-  },
-  cartInputs: {
-    display: 'flex',
-    gap: '16px',
-    paddingTop: '12px',
-    borderTop: '1px solid var(--color-border)',
-    flexWrap: 'wrap',
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    flex: 1,
-    minWidth: '140px',
-  },
-  inputLabel: {
-    fontSize: '0.74rem',
-    color: 'var(--color-muted)',
-    fontWeight: 500,
-  },
-  currencyIcon: {
-    position: 'absolute',
-    left: '10px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    fontSize: '0.85rem',
-    color: 'var(--color-muted)',
-    pointerEvents: 'none',
-  },
-  inlineInputPrice: {
-    width: '100%',
-    height: '36px',
-    padding: '6px 10px 6px 24px',
-    background: 'var(--color-surface2)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--color-text)',
-    fontSize: '0.88rem',
-    outline: 'none',
-  },
-  quantityControls: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-    background: 'var(--color-surface2)',
-    overflow: 'hidden',
-    height: '36px',
-  },
-  qtyBtn: {
-    width: '36px',
-    height: '100%',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--color-text)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'background 150ms var(--ease)',
-  },
-  qtyText: {
-    padding: '0 12px',
-    fontSize: '0.88rem',
-    fontWeight: 600,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    borderLeft: '1px solid var(--color-border)',
-    borderRight: '1px solid var(--color-border)',
-    height: '100%',
-  },
-  bottomBar: {
-    position: 'fixed',
-    bottom: 'var(--nav-height)',
-    right: 0,
-    height: '76px',
-    background: 'var(--color-surface)',
-    borderTop: '1px solid var(--color-border-strong)',
-    zIndex: 90,
-    boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.45)',
-  },
-  bottomBarContent: {
-    maxWidth: '680px',
-    margin: '0 auto',
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0 20px',
-  },
-  totalLabel: {
-    fontSize: '0.75rem',
-    color: 'var(--color-muted)',
-    fontWeight: 500,
-  },
-  totalVal: {
-    fontSize: '1.35rem',
-    fontWeight: 700,
-    color: '#4ade80',
-    lineHeight: 1.1,
-  },
-  finishBtn: {
-    padding: '10px 22px',
-  },
-  centerState: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '60px 24px',
-    textAlign: 'center',
-  },
-  tempItem: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '10px 14px',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-  },
-  actionBtnDanger: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--color-muted)',
-    padding: '4px',
-    borderRadius: 'var(--radius-sm)',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  successIcon: {
-    width: '72px',
-    height: '72px',
-    borderRadius: 'var(--radius-lg)',
-    background: 'rgba(46, 160, 67, 0.12)',
-    border: '1px solid rgba(46, 160, 67, 0.25)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '8px',
-  },
 }
