@@ -4,6 +4,7 @@ import { ddb, tables, scanAll } from '#shared/dynamoClient.mjs'
 import { hashSecret, verifySecret } from '#shared/password.mjs'
 import { signJwt, authenticateRequest, requireAdmin } from '#shared/jwt.mjs'
 import { createRouter, HttpError, invalid } from '#shared/http.mjs'
+import { syncUserSnsSubscriptions, getSnsStatusMap } from '#shared/snsClient.mjs'
 
 const ROLES = ['admin', 'miembro']
 const AVATAR_COLORS = ['#e76f51', '#2a9d8f', '#e9c46a', '#457b9d', '#8e6bbf', '#f4a261', '#6a994e']
@@ -26,8 +27,19 @@ const toPerfil = (u) => ({
   tiene_pin: Boolean(u.pin_hash),
 })
 
-/** Proyección para usuarios autenticados (incluye email para las alertas SNS). */
-const toUsuario = (u) => ({ ...toPerfil(u), email: u.email || '' })
+/** Proyección para usuarios autenticados (incluye email y estado SNS). */
+const toUsuario = (u, snsEstado) => ({
+  ...toPerfil(u),
+  email: u.email || '',
+  ...(snsEstado !== undefined ? { sns_estado: snsEstado } : {}),
+})
+
+function resolveSnsEstado(email, statusMap) {
+  const norm = (email || '').trim().toLowerCase()
+  if (!norm) return 'sin_correo'
+  if (statusMap === null) return 'no_configurado'
+  return statusMap.get(norm) || 'no_suscrito'
+}
 
 const byNombre = (a, b) => a.nombre.localeCompare(b.nombre, 'es')
 
@@ -170,8 +182,15 @@ router.get('/api/protected/health', async ({ event }) => {
 
 router.get('/api/protected/usuarios', async ({ event }) => {
   authenticateRequest(event)
-  const usuarios = await scanAll({ TableName: tables.usuarios })
-  return { body: usuarios.map(toUsuario).sort(byNombre) }
+  const [usuarios, statusMap] = await Promise.all([
+    scanAll({ TableName: tables.usuarios }),
+    getSnsStatusMap(),
+  ])
+  return {
+    body: usuarios
+      .map((u) => toUsuario(u, resolveSnsEstado(u.email, statusMap)))
+      .sort(byNombre),
+  }
 })
 
 router.post('/api/protected/usuarios', async ({ event, body }) => {
@@ -204,21 +223,43 @@ router.post('/api/protected/usuarios', async ({ event, body }) => {
     Item: user,
     ConditionExpression: 'attribute_not_exists(id)',
   }))
-  return { status: 201, body: toUsuario(user) }
+
+  let snsEstado = email ? 'no_configurado' : 'sin_correo'
+  if (email) {
+    const allUsuarios = await scanAll({ TableName: tables.usuarios })
+    const syncRes = await syncUserSnsSubscriptions({ emailAnterior: null, emailNuevo: email, allUsuarios })
+    snsEstado = syncRes.estado
+  }
+
+  return { status: 201, body: toUsuario(user, snsEstado) }
 })
 
 router.put('/api/protected/usuarios/:id', async ({ event, params, body }) => {
   const claims = authenticateRequest(event)
-  requireAdmin(claims)
+  const esAdmin = claims.rol === 'admin'
+  const esPropio = claims.sub === params.id
+  if (!esAdmin && !esPropio) {
+    throw new HttpError(403, 'Se requieren permisos de administrador')
+  }
   const data = body()
 
   const actual = await getUsuarioById(params.id)
   if (!actual) throw new HttpError(404, 'Integrante no encontrado')
 
+  // Un miembro estándar solo puede editar su propio correo, PIN, contraseña y color de avatar.
+  if (!esAdmin) {
+    if (data.rol !== undefined && data.rol !== actual.rol) {
+      throw new HttpError(403, 'Solo un administrador puede cambiar roles')
+    }
+    if (data.nombre !== undefined && data.nombre.trim() !== actual.nombre) {
+      throw new HttpError(403, 'Solo un administrador puede cambiar el nombre del perfil')
+    }
+  }
+
   const nuevo = { ...actual }
-  if (data.nombre !== undefined) nuevo.nombre = textoRequerido(data.nombre, 'nombre')
+  if (esAdmin && data.nombre !== undefined) nuevo.nombre = textoRequerido(data.nombre, 'nombre')
   if (data.email !== undefined) nuevo.email = validarEmail(data.email)
-  if (data.rol !== undefined) nuevo.rol = validarRol(data.rol)
+  if (esAdmin && data.rol !== undefined) nuevo.rol = validarRol(data.rol)
   if (data.avatar_color !== undefined) nuevo.avatar_color = validarColor(data.avatar_color)
   if (data.password) nuevo.password_hash = hashSecret(validarPassword(data.password))
   if (data.pin !== undefined) {
@@ -228,7 +269,7 @@ router.put('/api/protected/usuarios/:id', async ({ event, params, body }) => {
     nuevo.pin_bloqueado_hasta = null
   }
 
-  if (actual.id === claims.sub && nuevo.rol !== 'admin') {
+  if (actual.id === claims.sub && nuevo.rol !== 'admin' && esAdmin) {
     throw invalid('No puedes quitarte a ti mismo el rol de administrador')
   }
   if (nuevo.nombre !== actual.nombre) await asegurarNombreUnico(nuevo.nombre, actual.id)
@@ -238,7 +279,51 @@ router.put('/api/protected/usuarios/:id', async ({ event, params, body }) => {
     Item: nuevo,
     ConditionExpression: 'attribute_exists(id)',
   }))
-  return { body: toUsuario(nuevo) }
+
+  const emailCambio = (actual.email || '').trim().toLowerCase() !== (nuevo.email || '').trim().toLowerCase()
+  let snsEstado
+  if (emailCambio || data.email !== undefined) {
+    const allUsuarios = await scanAll({ TableName: tables.usuarios })
+    const syncRes = await syncUserSnsSubscriptions({
+      emailAnterior: actual.email,
+      emailNuevo: nuevo.email,
+      allUsuarios,
+    })
+    snsEstado = syncRes.estado
+  } else {
+    const statusMap = await getSnsStatusMap()
+    snsEstado = resolveSnsEstado(nuevo.email, statusMap)
+  }
+
+  return { body: toUsuario(nuevo, snsEstado) }
+})
+
+router.post('/api/protected/usuarios/:id/sns-suscribir', async ({ event, params }) => {
+  const claims = authenticateRequest(event)
+  if (claims.rol !== 'admin' && claims.sub !== params.id) {
+    throw new HttpError(403, 'Solo puedes gestionar las notificaciones de tu propio perfil')
+  }
+
+  const actual = await getUsuarioById(params.id)
+  if (!actual) throw new HttpError(404, 'Integrante no encontrado')
+  if (!actual.email) throw invalid('Este perfil no tiene un correo electrónico configurado')
+
+  const allUsuarios = await scanAll({ TableName: tables.usuarios })
+  const syncRes = await syncUserSnsSubscriptions({
+    emailAnterior: null,
+    emailNuevo: actual.email,
+    allUsuarios,
+  })
+
+  const message = syncRes.estado === 'confirmado'
+    ? 'Las alertas SNS ya están confirmadas y activas para este correo.'
+    : syncRes.estado === 'pendiente'
+      ? `Se envió el correo de confirmación de AWS SNS a ${actual.email}. Revisa tu bandeja de entrada o Spam.`
+      : syncRes.estado === 'no_configurado'
+        ? 'Los tópicos de Amazon SNS aún no están configurados en el servidor.'
+        : 'No se pudo sincronizar la suscripción con Amazon SNS.'
+
+  return { body: { message, sns_estado: syncRes.estado, sns_detalle: syncRes } }
 })
 
 router.delete('/api/protected/usuarios/:id', async ({ event, params }) => {
@@ -250,6 +335,12 @@ router.delete('/api/protected/usuarios/:id', async ({ event, params }) => {
   if (!actual) throw new HttpError(404, 'Integrante no encontrado')
 
   await ddb.send(new DeleteCommand({ TableName: tables.usuarios, Key: { id: params.id } }))
+
+  if (actual.email) {
+    const allUsuarios = await scanAll({ TableName: tables.usuarios })
+    await syncUserSnsSubscriptions({ emailAnterior: actual.email, emailNuevo: null, allUsuarios })
+  }
+
   return { body: { message: 'Integrante eliminado correctamente' } }
 })
 

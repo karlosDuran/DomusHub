@@ -2,6 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { installFakeDynamo, apiEvent } from './helpers/fakeDynamo.mjs'
 import { hashSecret } from '#shared/password.mjs'
+import { sns } from '#shared/snsClient.mjs'
 import { handler } from '../lambdas/auth/index.mjs'
 
 process.env.JWT_SECRET = 'test-secret'
@@ -109,4 +110,133 @@ test('OPTIONS devuelve 204 con CORS', async () => {
   const res = await handler(apiEvent('OPTIONS', '/api/auth/login'))
   assert.equal(res.statusCode, 204)
   assert.ok(res.headers['Access-Control-Allow-Methods'].includes('PATCH'))
+})
+
+test('miembro puede editar su propio correo y PIN pero no otros perfiles ni su rol', async () => {
+  const tokenAna = (await call('POST', '/api/auth/login', { body: { nombre: 'Ana', password: 'secreto1' } })).body.token
+
+  const ok = await call('PUT', '/api/protected/usuarios/usr_ana', {
+    token: tokenAna,
+    body: { email: 'ana.personal@ejemplo.com', pin: '9876' },
+  })
+  assert.equal(ok.status, 200)
+  assert.equal(ok.body.email, 'ana.personal@ejemplo.com')
+  assert.equal(ok.body.tiene_pin, true)
+
+  // No puede editar a otro usuario ni promoverse a admin
+  assert.equal((await call('PUT', '/api/protected/usuarios/usr_admin', { token: tokenAna, body: { email: 'hack@x.com' } })).status, 403)
+  assert.equal((await call('PUT', '/api/protected/usuarios/usr_ana', { token: tokenAna, body: { rol: 'admin' } })).status, 403)
+  assert.equal((await call('PUT', '/api/protected/usuarios/usr_ana', { token: tokenAna, body: { nombre: 'Otro' } })).status, 403)
+})
+
+test('sincronización automática SNS al crear, cambiar correo, reenviar y eliminar perfil', async () => {
+  const origSend = sns.send.bind(sns)
+  const prevTareas = process.env.SNS_TAREAS_TOPIC_ARN
+  const prevDespensa = process.env.SNS_DESPENSA_TOPIC_ARN
+  process.env.SNS_TAREAS_TOPIC_ARN = 'arn:aws:sns:us-east-1:123456789012:homeops-avisos-tareas'
+  process.env.SNS_DESPENSA_TOPIC_ARN = 'arn:aws:sns:us-east-1:123456789012:homeops-alertas-despensa'
+
+  const subsByTopic = {
+    [process.env.SNS_TAREAS_TOPIC_ARN]: [],
+    [process.env.SNS_DESPENSA_TOPIC_ARN]: [],
+  }
+  const calls = []
+
+  sns.send = async (command) => {
+    const type = command.constructor.name
+    const input = command.input
+    calls.push({ type, input })
+
+    if (type === 'ListSubscriptionsByTopicCommand') {
+      return { Subscriptions: [...(subsByTopic[input.TopicArn] || [])] }
+    }
+    if (type === 'SubscribeCommand') {
+      const list = subsByTopic[input.TopicArn]
+      const existing = list.find((s) => s.Endpoint === input.Endpoint)
+      if (!existing) {
+        list.push({
+          SubscriptionArn: 'PendingConfirmation',
+          Protocol: 'email',
+          Endpoint: input.Endpoint,
+          Attributes: input.Attributes || {},
+        })
+      } else {
+        existing.Attributes = input.Attributes || {}
+      }
+      return { SubscriptionArn: 'PendingConfirmation' }
+    }
+    if (type === 'SetSubscriptionAttributesCommand') {
+      for (const list of Object.values(subsByTopic)) {
+        const sub = list.find((s) => s.SubscriptionArn === input.SubscriptionArn)
+        if (sub) sub.Attributes = { ...(sub.Attributes || {}), [input.AttributeName]: input.AttributeValue }
+      }
+      return {}
+    }
+    if (type === 'UnsubscribeCommand') {
+      for (const [arn, list] of Object.entries(subsByTopic)) {
+        subsByTopic[arn] = list.filter((s) => s.SubscriptionArn !== input.SubscriptionArn)
+      }
+      return {}
+    }
+    throw new Error(`Comando SNS no simulado: ${type}`)
+  }
+
+  try {
+    const token = await loginAdmin()
+
+    // 1. Crear integrante con correo → suscribe a ambos tópicos y aplica FilterPolicy con su id + "familia"
+    const creado = await call('POST', '/api/protected/usuarios', {
+      token,
+      body: { nombre: 'Carlos', email: 'carlos@ejemplo.com', rol: 'miembro', password: 'abcdef' },
+    })
+    assert.equal(creado.status, 201)
+    assert.equal(creado.body.sns_estado, 'pendiente')
+
+    const subTareas = subsByTopic[process.env.SNS_TAREAS_TOPIC_ARN].find((s) => s.Endpoint === 'carlos@ejemplo.com')
+    assert.ok(subTareas)
+    assert.deepEqual(JSON.parse(subTareas.Attributes.FilterPolicy), {
+      destinatario: [creado.body.id, 'familia'],
+    })
+    assert.ok(subsByTopic[process.env.SNS_DESPENSA_TOPIC_ARN].some((s) => s.Endpoint === 'carlos@ejemplo.com'))
+
+    // 2. Simular confirmación en ambos tópicos y verificar GET /usuarios
+    subTareas.SubscriptionArn = 'arn:aws:sns:us-east-1:123456789012:homeops-avisos-tareas:sub-1'
+    subsByTopic[process.env.SNS_DESPENSA_TOPIC_ARN][0].SubscriptionArn = 'arn:aws:sns:us-east-1:123456789012:homeops-alertas-despensa:sub-2'
+
+    const lista = await call('GET', '/api/protected/usuarios', { token })
+    assert.equal(lista.body.find((u) => u.id === creado.body.id).sns_estado, 'confirmado')
+    assert.equal(lista.body.find((u) => u.id === 'usr_ana').sns_estado, 'no_suscrito')
+
+    // 3. Reenviar / activar suscripción manualmente desde el botón de perfil
+    const activarAna = await call('POST', '/api/protected/usuarios/usr_ana/sns-suscribir', { token })
+    assert.equal(activarAna.status, 200)
+    assert.equal(activarAna.body.sns_estado, 'pendiente')
+
+    // 4. Cambiar correo de Carlos → desuscribe el anterior confirmado y suscribe el nuevo
+    const cambio = await call('PUT', `/api/protected/usuarios/${creado.body.id}`, {
+      token,
+      body: { email: 'carlos.nuevo@ejemplo.com' },
+    })
+    assert.equal(cambio.status, 200)
+    assert.equal(cambio.body.sns_estado, 'pendiente')
+    assert.ok(!subsByTopic[process.env.SNS_TAREAS_TOPIC_ARN].some((s) => s.Endpoint === 'carlos@ejemplo.com'))
+    assert.ok(subsByTopic[process.env.SNS_TAREAS_TOPIC_ARN].some((s) => s.Endpoint === 'carlos.nuevo@ejemplo.com'))
+
+    // 5. Confirmar nuevo correo y eliminar perfil → desuscribe automáticamente
+    subsByTopic[process.env.SNS_TAREAS_TOPIC_ARN]
+      .find((s) => s.Endpoint === 'carlos.nuevo@ejemplo.com').SubscriptionArn = 'arn:aws:sns:us-east-1:123456789012:homeops-avisos-tareas:sub-3'
+    subsByTopic[process.env.SNS_DESPENSA_TOPIC_ARN]
+      .find((s) => s.Endpoint === 'carlos.nuevo@ejemplo.com').SubscriptionArn = 'arn:aws:sns:us-east-1:123456789012:homeops-alertas-despensa:sub-4'
+
+    const del = await call('DELETE', `/api/protected/usuarios/${creado.body.id}`, { token })
+    assert.equal(del.status, 200)
+    assert.ok(!subsByTopic[process.env.SNS_TAREAS_TOPIC_ARN].some((s) => s.Endpoint === 'carlos.nuevo@ejemplo.com'))
+    assert.ok(!subsByTopic[process.env.SNS_DESPENSA_TOPIC_ARN].some((s) => s.Endpoint === 'carlos.nuevo@ejemplo.com'))
+  } finally {
+    sns.send = origSend
+    if (prevTareas === undefined) delete process.env.SNS_TAREAS_TOPIC_ARN
+    else process.env.SNS_TAREAS_TOPIC_ARN = prevTareas
+    if (prevDespensa === undefined) delete process.env.SNS_DESPENSA_TOPIC_ARN
+    else process.env.SNS_DESPENSA_TOPIC_ARN = prevDespensa
+  }
 })
