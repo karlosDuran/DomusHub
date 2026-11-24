@@ -671,15 +671,27 @@ Ve a **IAM → Roles → Create role**:
       ]
     },
     {
-      "Sid": "HomeOpsSNSPublishAccess",
+      "Sid": "HomeOpsSNSTopicAccess",
       "Effect": "Allow",
       "Action": [
-        "sns:Publish"
+        "sns:Publish",
+        "sns:Subscribe",
+        "sns:ListSubscriptionsByTopic"
       ],
       "Resource": [
         "arn:aws:sns:us-east-1:<ACCOUNT_ID>:homeops-avisos-tareas",
         "arn:aws:sns:us-east-1:<ACCOUNT_ID>:homeops-alertas-despensa"
       ]
+    },
+    {
+      "Sid": "HomeOpsSNSSubscriptionManage",
+      "Effect": "Allow",
+      "Action": [
+        "sns:Unsubscribe",
+        "sns:SetSubscriptionAttributes",
+        "sns:GetSubscriptionAttributes"
+      ],
+      "Resource": "*"
     }
   ]
 }
@@ -810,7 +822,7 @@ Para cada función (`homeops-auth`, `homeops-inventario`, `homeops-kanban`, `hom
 
 | Función Lambda | Variables de Entorno |
 | :--- | :--- |
-| `homeops-auth` | `TABLE_USUARIOS=homeops-usuarios`<br>`JWT_SECRET=<tu_secreto_64_hex>`<br>`JWT_EXPIRATION=86400`<br>`CORS_ORIGIN=*` *(cambiar a tu dominio CloudFront al terminar Fase 9)* |
+| `homeops-auth` | `TABLE_USUARIOS=homeops-usuarios`<br>`SNS_TAREAS_TOPIC_ARN=arn:aws:sns:us-east-1:<ACCOUNT_ID>:homeops-avisos-tareas`<br>`SNS_DESPENSA_TOPIC_ARN=arn:aws:sns:us-east-1:<ACCOUNT_ID>:homeops-alertas-despensa`<br>`JWT_SECRET=<tu_secreto_64_hex>`<br>`JWT_EXPIRATION=86400`<br>`CORS_ORIGIN=*` *(cambiar a tu dominio CloudFront al terminar Fase 9)* |
 | `homeops-inventario` | `TABLE_PRODUCTOS=homeops-productos`<br>`JWT_SECRET=<mismo_secreto>`<br>`CORS_ORIGIN=*` |
 | `homeops-kanban` | `TABLE_COLUMNAS=homeops-kanban-columnas`<br>`TABLE_TAREAS=homeops-tareas`<br>`TABLE_HISTORIAL=homeops-tareas-historial`<br>`TABLE_USUARIOS=homeops-usuarios`<br>`SNS_TAREAS_TOPIC_ARN=arn:aws:sns:us-east-1:<ACCOUNT_ID>:homeops-avisos-tareas`<br>`JWT_SECRET=<mismo_secreto>`<br>`TZ=America/Mexico_City`<br>`CORS_ORIGIN=*` |
 | `homeops-stock-alerts` | `SNS_DESPENSA_TOPIC_ARN=arn:aws:sns:us-east-1:<ACCOUNT_ID>:homeops-alertas-despensa` |
